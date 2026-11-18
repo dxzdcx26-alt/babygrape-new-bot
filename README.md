@@ -3,6 +3,8 @@
 บอท Discord สร้างใหม่จากต้นแบบ [baby-grape-bot](https://github.com/marshmayris/baby-grape-bot)  
 **Application ID:** `1572394577724317788`
 
+**Repo (บัญชีที่เชื่อม):** https://github.com/dxzdcx26-alt/babygrape-new-bot
+
 ระบบหลักทำแบบของเดิมเป๊ะ: Heist Report, คะแนน Weekly/Monthly, Leaderboard ปักหมุด, Archive ทุก 3 วัน, คำสั่ง `!` เดิม, Google Sheets, Express uptime
 
 ---
