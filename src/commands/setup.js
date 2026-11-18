@@ -8,10 +8,6 @@ const { setSetting } = require('../database');
 const { sendAllPanels } = require('../panels/systemPanels');
 const { isAdmin, hasAdministrator } = require('../utils/permissions');
 
-/**
- * /setup — คำสั่งหลักเพียงตัวเดียว
- * สร้างหมวด/ห้อง + วางแผงปุ่มทุกห้อง
- */
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setup')
@@ -25,8 +21,6 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    // ใช้ isAdmin อย่างเดียว — อย่าเรียก member.permissions.has โดยตรง
-    // (เมื่อไม่มี Server Members Intent permissions เป็น string)
     if (!isAdmin(interaction.member)) {
       return interaction.reply({
         content: '❌ คำสั่งนี้สำหรับแอดมินเท่านั้นนะคับ',
@@ -43,27 +37,6 @@ module.exports = {
 
     const force = interaction.options.getBoolean('force') || false;
     const me = guild.members.me;
-    if (me && !hasAdministrator(me) && !me.permissions?.has?.(PermissionFlagsBits.ManageChannels)) {
-      // ถ้าบอทไม่มี Manage Channels
-      const canManage =
-        me.permissions?.has?.(PermissionFlagsBits.ManageChannels) ||
-        (me.permissions &&
-          (() => {
-            try {
-              return new (require('discord.js').PermissionsBitField)(
-                BigInt(me.permissions),
-              ).has(PermissionFlagsBits.ManageChannels);
-            } catch {
-              return false;
-            }
-          })());
-      if (!canManage) {
-        return interaction.editReply({
-          content:
-            '❌ บอทไม่มีสิทธิ์ **Manage Channels** — ปรับยศบอทให้สูงขึ้นก่อน',
-        });
-      }
-    }
 
     const created = [];
     const reused = [];
@@ -124,6 +97,8 @@ module.exports = {
       await findOrCreateText('สรุปคนลา', systemCat, 'สรุปรายงานการลา');
       await findOrCreateText('สรุปเช็คชื่อ', systemCat, 'สรุปรายชื่อเช็คชื่อ');
       const log = await findOrCreateText('ประวัติ-log', systemCat, 'Log');
+      // แผง setup หลักตามภาพ
+      const adminCh = await findOrCreateText('heist-score', systemCat, 'แผงจัดการระบบ');
 
       let target = guild.channels.cache.find(
         (c) =>
@@ -151,6 +126,7 @@ module.exports = {
         ARCHIVE_CATEGORY_ID: archiveCat.id,
         LEAVE_CHANNEL_ID: leaveCh.id,
         CHECKIN_CHANNEL_ID: checkinCh.id,
+        ADMIN_CHANNEL_ID: adminCh.id,
       };
 
       for (const [key, value] of Object.entries(mapping)) {
@@ -165,6 +141,7 @@ module.exports = {
         storage: storageCh,
         score,
         log,
+        admin: adminCh,
       });
 
       const envBlock = Object.entries(mapping)
@@ -173,7 +150,7 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setColor('Green')
-        .setTitle('✅ Setup เสร็จ — ใช้ปุ่มในห้องได้เลย')
+        .setTitle('✅ Setup เสร็จ — ดูแผงที่ #heist-score')
         .setDescription(
           [
             created.length
@@ -183,7 +160,8 @@ module.exports = {
               ? `**ใช้ของเดิม:**\n${reused.map((x) => `• ${x}`).join('\n')}`
               : null,
             '',
-            'คำสั่งหลักมีแค่ **/setup** — ที่เหลือกดปุ่มในแผง',
+            'แผงจัดการอยู่ที่ **#heist-score** (ตั้งค่าห้อง / กิจกรรม / เช็คชื่อ / ยศ ฯลฯ)',
+            'ห้องอื่นมีปุ่มใช้งานแล้ว — ไม่ต้องจำ slash command',
           ]
             .filter(Boolean)
             .join('\n'),
@@ -193,7 +171,7 @@ module.exports = {
             name: 'แผงที่ส่งแล้ว',
             value:
               (panelResults || [])
-                .slice(0, 10)
+                .slice(0, 12)
                 .map((x) => `• ${x}`)
                 .join('\n') || '—',
           },
