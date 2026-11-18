@@ -5,22 +5,24 @@ const {
   EmbedBuilder,
 } = require('discord.js');
 const { setSetting } = require('../database');
+const { sendAllPanels } = require('../panels/systemPanels');
 const { isAdmin } = require('../utils/permissions');
 const fs = require('fs');
 const path = require('path');
 
 /**
- * /setup — สร้างหมวด + ห้องตามโครงสร้าง Baby Grape System (ตามรูป)
+ * /setup — คำสั่งหลักเพียงตัวเดียว
+ * สร้างหมวด/ห้อง + วางแผงปุ่มทุกห้อง (ใช้งานด้วยปุ่ม ไม่ต้องจำ slash)
  */
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setup')
-    .setDescription('สร้างหมวด/ห้อง Baby Grape System อัตโนมัติ (แอดมิน)')
+    .setDescription('สร้างห้อง + แผงปุ่ม Baby Grape System (แอดมิน)')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addBooleanOption((opt) =>
       opt
         .setName('force')
-        .setDescription('สร้างใหม่แม้มีชื่อห้องซ้ำแล้ว (default: ใช้ห้องที่มีอยู่)')
+        .setDescription('สร้างใหม่แม้มีชื่อห้องซ้ำแล้ว')
         .setRequired(false),
     ),
 
@@ -47,7 +49,7 @@ module.exports = {
     if (!me.permissions.has(PermissionFlagsBits.ManageChannels)) {
       return interaction.editReply({
         content:
-          '❌ บอทไม่มีสิทธิ์ **Manage Channels** — ปรับยศบอทให้สูงขึ้นหรือให้สิทธิ์นี้ก่อน',
+          '❌ บอทไม่มีสิทธิ์ **Manage Channels** — ปรับยศบอทให้สูงขึ้นก่อน',
       });
     }
 
@@ -100,20 +102,20 @@ module.exports = {
       const control = await findOrCreateText(
         'ลงทะเบียนกิจกรรม',
         systemCat,
-        'ปุ่ม Heist Report / ลงทะเบียนผลงาน',
+        'ปุ่มลงทะเบียนกิจกรรม',
       );
-      const leaveCh = await findOrCreateText('แจ้งลา', systemCat, 'แจ้งลา /leave');
-      const checkinCh = await findOrCreateText('เช็คชื่อ', systemCat, 'เช็คชื่อ /checkin');
+      const leaveCh = await findOrCreateText('แจ้งลา', systemCat, 'แจ้งลา');
+      const checkinCh = await findOrCreateText('เช็คชื่อ', systemCat, 'เช็คชื่อ');
       await findOrCreateText('ส่งของ', systemCat, 'ส่งของ');
-      await findOrCreateText('คลังของแก๊ง', systemCat, 'คลังของแก๊ง');
+      const storageCh = await findOrCreateText('คลังของแก๊ง', systemCat, 'คลังของแก๊ง');
       const score = await findOrCreateText(
         'ตารางคะแนน',
         systemCat,
-        'กระดานคะแนน Weekly / Monthly',
+        'กระดานคะแนน',
       );
       await findOrCreateText('สรุปคนลา', systemCat, 'สรุปรายงานการลา');
       await findOrCreateText('สรุปเช็คชื่อ', systemCat, 'สรุปรายชื่อเช็คชื่อ');
-      const log = await findOrCreateText('ประวัติ-log', systemCat, 'Log รายงาน Heist');
+      const log = await findOrCreateText('ประวัติ-log', systemCat, 'Log');
 
       let target = guild.channels.cache.find(
         (c) =>
@@ -126,7 +128,7 @@ module.exports = {
         target = await findOrCreateText(
           'heist-chat',
           systemCat,
-          'ห้องแชทกิจกรรม — ถูกรีเซ็ตเข้ากรุทุก 3 วัน',
+          'ห้องแชทกิจกรรม — รีเซ็ตเข้ากรุทุก 3 วัน',
         );
       } else {
         reused.push(`#${target.name}`);
@@ -145,38 +147,19 @@ module.exports = {
 
       for (const [key, value] of Object.entries(mapping)) {
         setSetting(key.toLowerCase(), value);
+        process.env[key] = value;
       }
       setSetting('target_channel_id', target.id);
 
-      const envPath = path.join(process.cwd(), '.env');
-      try {
-        let envText = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
-        for (const [key, value] of Object.entries(mapping)) {
-          const re = new RegExp(`^${key}=.*$`, 'm');
-          if (re.test(envText)) envText = envText.replace(re, `${key}=${value}`);
-          else envText += `\n${key}=${value}`;
-        }
-        if (!process.env.ADMIN_ROLE_ID) {
-          const topRole = interaction.member.roles.cache
-            .filter((r) => r.id !== guild.id)
-            .sort((a, b) => b.position - a.position)
-            .first();
-          if (topRole) {
-            const re = /^ADMIN_ROLE_ID=.*$/m;
-            if (re.test(envText)) envText = envText.replace(re, `ADMIN_ROLE_ID=${topRole.id}`);
-            else envText += `\nADMIN_ROLE_ID=${topRole.id}`;
-            mapping.ADMIN_ROLE_ID = topRole.id;
-            setSetting('admin_role_id', topRole.id);
-          }
-        }
-        fs.writeFileSync(envPath, envText.trim() + '\n', 'utf8');
-      } catch (e) {
-        console.warn('อัปเดต .env ไม่ได้:', e.message);
-      }
-
-      for (const [key, value] of Object.entries(mapping)) {
-        process.env[key] = value;
-      }
+      // วางแผงปุ่มทุกห้อง
+      const panelResults = await sendAllPanels(guild, {
+        control,
+        leave: leaveCh,
+        checkin: checkinCh,
+        storage: storageCh,
+        score,
+        log,
+      });
 
       const envBlock = Object.entries(mapping)
         .map(([k, v]) => `${k}=${v}`)
@@ -184,7 +167,7 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setColor('Green')
-        .setTitle('✅ Setup Baby Grape System เสร็จแล้ว')
+        .setTitle('✅ Setup เสร็จ — ใช้ปุ่มในห้องได้เลย')
         .setDescription(
           [
             created.length
@@ -194,15 +177,25 @@ module.exports = {
               ? `**ใช้ของเดิม:**\n${reused.map((x) => `• ${x}`).join('\n')}`
               : null,
             '',
-            'ค่า ID ถูกบันทึกแล้ว — แนะนำรีสตาร์ทบอทหนึ่งครั้ง',
+            'คำสั่งหลักมีแค่ **/setup** — ที่เหลือกดปุ่มในแผง',
           ]
             .filter(Boolean)
             .join('\n'),
         )
-        .addFields({
-          name: 'ตัวแปรที่ตั้งแล้ว',
-          value: '```env\n' + envBlock.slice(0, 1000) + '\n```',
-        })
+        .addFields(
+          {
+            name: 'แผงที่ส่งแล้ว',
+            value:
+              (panelResults || [])
+                .slice(0, 10)
+                .map((x) => `• ${x}`)
+                .join('\n') || '—',
+          },
+          {
+            name: 'Channel IDs',
+            value: '```env\n' + envBlock.slice(0, 900) + '\n```',
+          },
+        )
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
