@@ -1,0 +1,275 @@
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} = require('discord.js');
+
+/**
+ * แผงปุ่มแบบ Baby Grape เต็มระบบ — ใช้หลัง /setup
+ * ผู้ใช้กดปุ่ม ไม่ต้องจำ slash command
+ */
+
+function activityPanel() {
+  const embed = new EmbedBuilder()
+    .setColor(0x8b5cf6)
+    .setTitle('🍇 Activity Zone !')
+    .setDescription(
+      [
+        '**ใช้สำหรับบันทึกการเข้าร่วมกิจกรรม**',
+        '',
+        '**Guideline**',
+        '• เงื่อนไขการนับคะแนน — ระบบจะนับคะแนนให้เฉพาะผู้ที่กดปุ่มด้านล่างเท่านั้น',
+        '• วิธีการบันทึก — โปรดเลือกรายชื่อให้ครบทุกคน (รวมถึงตัวเองด้วย)',
+        '• หากมีข้อสงสัย สามารถติดต่อให้แอดมินช่วยตรวจสอบได้',
+        '',
+        '*Enjoy Activities ! · Baby Grape System 🍇*',
+      ].join('\n'),
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('start_heist_report')
+      .setLabel('เริ่มลงทะเบียน')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('📝'),
+  );
+  return { embeds: [embed], components: [row] };
+}
+
+function leavePanel() {
+  const embed = new EmbedBuilder()
+    .setColor(0x8b5cf6)
+    .setTitle('🍇 Leave Zone !')
+    .setDescription(
+      [
+        '**ระบบบันทึกการลา**',
+        '',
+        '**Guideline**',
+        '• เลือกวันที่ต้องการลาให้ถูกต้อง',
+        '• ระบุประเภทและเหตุผลสั้น ๆ',
+        '• ระบบจะบันทึกข้อมูลและแจ้งเตือนผู้ดูแลให้อัตโนมัติ',
+        '',
+        '*Take care and see you soon ! · Baby Grape System 🍇*',
+      ].join('\n'),
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('leave_request_btn')
+      .setLabel('แจ้งลา')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('📝'),
+  );
+  return { embeds: [embed], components: [row] };
+}
+
+function checkinPanel() {
+  const embed = new EmbedBuilder()
+    .setColor(0x8b5cf6)
+    .setTitle('🍇 Check-in Zone !')
+    .setDescription(
+      [
+        '**ระบบเช็คชื่อ**',
+        '',
+        '**Guideline**',
+        '• ใช้สำหรับเช็คชื่อเข้าร่วมกิจกรรมหรือช่วงเวลาที่กำหนด',
+        '• เลือกรอบเช็คชื่อจากระบบที่แอดมินเปิดไว้',
+        '• ระบบจะบันทึกเวลาเช็คชื่อให้อัตโนมัติ',
+        '',
+        "*Don't forget to check-in ! · Baby Grape System 🍇*",
+      ].join('\n'),
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('checkin_join_btn')
+      .setLabel('เช็คชื่อ')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('📌'),
+  );
+  return { embeds: [embed], components: [row] };
+}
+
+function storagePanel() {
+  const embed = new EmbedBuilder()
+    .setColor(0x8b5cf6)
+    .setTitle('🍇 Storage Zone ! · คลังของแก๊ง')
+    .setDescription(
+      [
+        '**Current Stock**',
+        '✕ คลังว่างเปล่า (Empty)',
+        '',
+        '**วิธีใช้งาน**',
+        '• กดปุ่ม "เบิกของ" เพื่อเบิกของจากคลัง',
+        '• ต้องใส่ลิงก์รูปหลักฐาน ทุกครั้ง',
+        '',
+        `*Updated: ${new Date().toLocaleString('th-TH')} · Baby Grape System 🍇*`,
+      ].join('\n'),
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('storage_withdraw_btn')
+      .setLabel('เบิกของ')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('📥'),
+    new ButtonBuilder()
+      .setCustomId('storage_admin_btn')
+      .setLabel('จัดการคลัง (Admin)')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('🛡️'),
+  );
+  return { embeds: [embed], components: [row] };
+}
+
+function adminPanel() {
+  const embed = new EmbedBuilder()
+    .setColor(0x7c3aed)
+    .setTitle('🍇 Baby Grape · แผงจัดการ')
+    .setDescription(
+      [
+        '**ระบบกิจกรรม (Activities)**',
+        'จัดการรายชื่อกิจกรรม กำหนดคะแนน และดูประวัติการลงทะเบียน',
+        '',
+        '**ระบบเช็คชื่อ (Check-in)**',
+        'สร้างหัวข้อเช็คชื่อ เปิด-ปิดรอบ และดูรายชื่อผู้ลงชื่อ',
+        '',
+        '**สิทธิ์การใช้งาน (Roles)**',
+        'กำหนด Role Admin / Helper / Member สำหรับจำกัดสิทธิ์',
+        '',
+        '**ตั้งค่าอื่นๆ (Settings)**',
+        'ตั้งเวลาปิดรับการลา แก้ไขคะแนน ดูประวัติย้อนหลัง',
+        '',
+        '*Enjoy Managing ! · Baby Grape System 🍇*',
+      ].join('\n'),
+    );
+  const rows = [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('admin_channel_settings')
+        .setLabel('ตั้งค่าห้อง')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('📌'),
+      new ButtonBuilder()
+        .setCustomId('admin_activities')
+        .setLabel('กิจกรรม')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('🎮'),
+      new ButtonBuilder()
+        .setCustomId('admin_checkin')
+        .setLabel('เช็คชื่อ')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('📅'),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('admin_roles')
+        .setLabel('ตั้งค่ายศ')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('👮'),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('admin_extra')
+        .setLabel('ตั้งค่าเพิ่มเติม')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('⚙️'),
+      new ButtonBuilder()
+        .setCustomId('admin_delivery')
+        .setLabel('ระบบส่งของ')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('📦'),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('admin_storage')
+        .setLabel('คลังแก๊ง')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('🏭'),
+    ),
+  ];
+  return { embeds: [embed], components: rows };
+}
+
+function scoreboardPlaceholder(type) {
+  const isWeekly = type === 'weekly';
+  const embed = new EmbedBuilder()
+    .setColor(0x8b5cf6)
+    .setTitle(
+      isWeekly
+        ? '🍇 ตารางคะแนนประจำสัปดาห์ (ทั้งหมด)'
+        : '🍇 ตารางคะแนนสะสมรวม (ทั้งหมด)',
+    )
+    .setDescription(
+      [
+        'อัปเดตล่าสุด: เพิ่งสร้าง',
+        '',
+        'ยังไม่มีข้อมูลคะแนนในหมวดนี้',
+        '',
+        '*Baby Grape System · Scoreboard !*',
+      ].join('\n'),
+    );
+  return embed;
+}
+
+function weeklyResetButton() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('weekly_reset_btn')
+      .setLabel('ตัดยอดคะแนน')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('✂️'),
+  );
+}
+
+/**
+ * ส่งแผงทั้งหมดเข้าห้องที่ /setup สร้าง
+ * @param {import('discord.js').Guild} guild
+ * @param {Record<string, import('discord.js').TextChannel>} channels
+ */
+async function sendAllPanels(guild, channels) {
+  const results = [];
+
+  async function post(ch, payload, label) {
+    if (!ch) {
+      results.push(`ข้าม ${label}: ไม่มีห้อง`);
+      return;
+    }
+    try {
+      await ch.send(payload);
+      results.push(`ส่งแผง ${label} → #${ch.name}`);
+    } catch (e) {
+      results.push(`ล้มเหลว ${label}: ${e.message}`);
+    }
+  }
+
+  await post(channels.control, activityPanel(), 'ลงทะเบียนกิจกรรม');
+  await post(channels.leave, leavePanel(), 'แจ้งลา');
+  await post(channels.checkin, checkinPanel(), 'เช็คชื่อ');
+  await post(channels.storage, storagePanel(), 'คลังของแก๊ง');
+
+  if (channels.score) {
+    try {
+      await channels.score.send({ embeds: [scoreboardPlaceholder('weekly')] });
+      await channels.score.send({
+        embeds: [scoreboardPlaceholder('monthly')],
+        components: [weeklyResetButton()],
+      });
+      results.push(`ส่งกระดานคะแนน → #${channels.score.name}`);
+    } catch (e) {
+      results.push(`ล้มเหลว ตารางคะแนน: ${e.message}`);
+    }
+  }
+
+  // แผงแอดมิน — วางในห้อง log หรือ control
+  const adminCh = channels.log || channels.control;
+  await post(adminCh, adminPanel(), 'แผงแอดมิน');
+
+  return results;
+}
+
+module.exports = {
+  activityPanel,
+  leavePanel,
+  checkinPanel,
+  storagePanel,
+  adminPanel,
+  sendAllPanels,
+};
