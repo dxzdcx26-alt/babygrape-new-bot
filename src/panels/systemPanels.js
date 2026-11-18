@@ -5,10 +5,7 @@ const {
   ButtonStyle,
 } = require('discord.js');
 
-/**
- * แผงปุ่มแบบ Baby Grape เต็มระบบ — ใช้หลัง /setup
- * ผู้ใช้กดปุ่ม ไม่ต้องจำ slash command
- */
+/** แผงปุ่ม Baby Grape — ใช้หลัง /setup */
 
 function activityPanel() {
   const embed = new EmbedBuilder()
@@ -119,27 +116,29 @@ function storagePanel() {
   return { embeds: [embed], components: [row] };
 }
 
+/** แผง #heist-score ตามภาพต้นแบบ */
 function adminPanel() {
   const embed = new EmbedBuilder()
     .setColor(0x7c3aed)
-    .setTitle('🍇 Baby Grape · แผงจัดการ')
     .setDescription(
       [
-        '**ระบบกิจกรรม (Activities)**',
-        'จัดการรายชื่อกิจกรรม กำหนดคะแนน และดูประวัติการลงทะเบียน',
+        '🎮 **ระบบกิจกรรม (Activities)**',
+        'จัดการรายชื่อกิจกรรม กำหนดคะแนนและดูประวัติการลงทะเบียน',
         '',
-        '**ระบบเช็คชื่อ (Check-in)**',
+        '📅 **ระบบเช็คชื่อ (Check-in)**',
         'สร้างหัวข้อเช็คชื่อ เปิด-ปิดรอบ และดูรายชื่อผู้ลงชื่อ',
         '',
-        '**สิทธิ์การใช้งาน (Roles)**',
-        'กำหนด Role Admin / Helper / Member สำหรับจำกัดสิทธิ์',
+        '👮 **สิทธิ์การใช้งาน (Roles)**',
+        'กำหนด Role Admin / Helper / Member สำหรับจำกัดสิทธิ์การใช้งาน',
         '',
-        '**ตั้งค่าอื่นๆ (Settings)**',
-        'ตั้งเวลาปิดรับการลา แก้ไขคะแนน ดูประวัติย้อนหลัง',
+        '⚙️ **ตั้งค่าอื่นๆ (Settings)**',
+        'ตั้งเวลาปิดรับการลา แก้ไขคะแนน ดูประวัติย้อนหลัง และอื่นๆ',
         '',
         '*Enjoy Managing ! · Baby Grape System 🍇*',
       ].join('\n'),
     );
+
+  // แถวปุ่มตามภาพ
   const rows = [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -190,7 +189,7 @@ function adminPanel() {
 
 function scoreboardPlaceholder(type) {
   const isWeekly = type === 'weekly';
-  const embed = new EmbedBuilder()
+  return new EmbedBuilder()
     .setColor(0x8b5cf6)
     .setTitle(
       isWeekly
@@ -206,7 +205,6 @@ function scoreboardPlaceholder(type) {
         '*Baby Grape System · Scoreboard !*',
       ].join('\n'),
     );
-  return embed;
 }
 
 function weeklyResetButton() {
@@ -219,11 +217,6 @@ function weeklyResetButton() {
   );
 }
 
-/**
- * ส่งแผงทั้งหมดเข้าห้องที่ /setup สร้าง
- * @param {import('discord.js').Guild} guild
- * @param {Record<string, import('discord.js').TextChannel>} channels
- */
 async function sendAllPanels(guild, channels) {
   const results = [];
 
@@ -258,9 +251,9 @@ async function sendAllPanels(guild, channels) {
     }
   }
 
-  // แผงแอดมิน — วางในห้อง log หรือ control
-  const adminCh = channels.log || channels.control;
-  await post(adminCh, adminPanel(), 'แผงแอดมิน');
+  // แผง setup หลัก = #heist-score ตามภาพ
+  const adminCh = channels.admin || channels.log || channels.control;
+  await post(adminCh, adminPanel(), 'แผงจัดการ (heist-score)');
 
   return results;
 }
