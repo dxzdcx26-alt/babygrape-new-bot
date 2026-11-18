@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Database (runtime - do not commit)
+data/*.db
+data/*.db-*
+data/*.sqlite
+data/*.sqlite3
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Old bot data / backups
+scores.json
+scores.json.bak
+log.csv
+log.csv.bak
+*.bak
