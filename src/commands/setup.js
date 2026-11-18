@@ -6,13 +6,11 @@ const {
 } = require('discord.js');
 const { setSetting } = require('../database');
 const { sendAllPanels } = require('../panels/systemPanels');
-const { isAdmin } = require('../utils/permissions');
-const fs = require('fs');
-const path = require('path');
+const { isAdmin, hasAdministrator } = require('../utils/permissions');
 
 /**
  * /setup — คำสั่งหลักเพียงตัวเดียว
- * สร้างหมวด/ห้อง + วางแผงปุ่มทุกห้อง (ใช้งานด้วยปุ่ม ไม่ต้องจำ slash)
+ * สร้างหมวด/ห้อง + วางแผงปุ่มทุกห้อง
  */
 module.exports = {
   data: new SlashCommandBuilder()
@@ -27,10 +25,9 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    if (
-      !isAdmin(interaction.member) &&
-      !interaction.member.permissions.has(PermissionFlagsBits.Administrator)
-    ) {
+    // ใช้ isAdmin อย่างเดียว — อย่าเรียก member.permissions.has โดยตรง
+    // (เมื่อไม่มี Server Members Intent permissions เป็น string)
+    if (!isAdmin(interaction.member)) {
       return interaction.reply({
         content: '❌ คำสั่งนี้สำหรับแอดมินเท่านั้นนะคับ',
         ephemeral: true,
@@ -46,11 +43,26 @@ module.exports = {
 
     const force = interaction.options.getBoolean('force') || false;
     const me = guild.members.me;
-    if (!me.permissions.has(PermissionFlagsBits.ManageChannels)) {
-      return interaction.editReply({
-        content:
-          '❌ บอทไม่มีสิทธิ์ **Manage Channels** — ปรับยศบอทให้สูงขึ้นก่อน',
-      });
+    if (me && !hasAdministrator(me) && !me.permissions?.has?.(PermissionFlagsBits.ManageChannels)) {
+      // ถ้าบอทไม่มี Manage Channels
+      const canManage =
+        me.permissions?.has?.(PermissionFlagsBits.ManageChannels) ||
+        (me.permissions &&
+          (() => {
+            try {
+              return new (require('discord.js').PermissionsBitField)(
+                BigInt(me.permissions),
+              ).has(PermissionFlagsBits.ManageChannels);
+            } catch {
+              return false;
+            }
+          })());
+      if (!canManage) {
+        return interaction.editReply({
+          content:
+            '❌ บอทไม่มีสิทธิ์ **Manage Channels** — ปรับยศบอทให้สูงขึ้นก่อน',
+        });
+      }
     }
 
     const created = [];
@@ -108,11 +120,7 @@ module.exports = {
       const checkinCh = await findOrCreateText('เช็คชื่อ', systemCat, 'เช็คชื่อ');
       await findOrCreateText('ส่งของ', systemCat, 'ส่งของ');
       const storageCh = await findOrCreateText('คลังของแก๊ง', systemCat, 'คลังของแก๊ง');
-      const score = await findOrCreateText(
-        'ตารางคะแนน',
-        systemCat,
-        'กระดานคะแนน',
-      );
+      const score = await findOrCreateText('ตารางคะแนน', systemCat, 'กระดานคะแนน');
       await findOrCreateText('สรุปคนลา', systemCat, 'สรุปรายงานการลา');
       await findOrCreateText('สรุปเช็คชื่อ', systemCat, 'สรุปรายชื่อเช็คชื่อ');
       const log = await findOrCreateText('ประวัติ-log', systemCat, 'Log');
@@ -149,9 +157,7 @@ module.exports = {
         setSetting(key.toLowerCase(), value);
         process.env[key] = value;
       }
-      setSetting('target_channel_id', target.id);
 
-      // วางแผงปุ่มทุกห้อง
       const panelResults = await sendAllPanels(guild, {
         control,
         leave: leaveCh,
@@ -201,7 +207,9 @@ module.exports = {
       await interaction.editReply({ embeds: [embed] });
     } catch (err) {
       console.error('/setup failed:', err);
-      await interaction.editReply({ content: `❌ Setup ล้มเหลว: ${err.message}` });
+      await interaction.editReply({
+        content: `❌ Setup ล้มเหลว: ${err.message}`,
+      });
     }
   },
 };
