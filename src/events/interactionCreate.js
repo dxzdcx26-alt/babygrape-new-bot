@@ -3,11 +3,16 @@ const {
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
+  MessageFlags,
 } = require('discord.js');
 const {
   isHeistInteraction,
   handleHeistInteraction,
 } = require('../interactions/heist');
+const {
+  isAdminPanelInteraction,
+  handleAdminPanel,
+} = require('../interactions/adminPanel');
 const { handleLeaveModal } = require('../commands/leave');
 const {
   getOpenCheckinSession,
@@ -30,6 +35,12 @@ module.exports = {
         return;
       }
 
+      // แผงแอดมิน (ปุ่ม / select / modal)
+      if (isAdminPanelInteraction(interaction)) {
+        await handleAdminPanel(interaction);
+        return;
+      }
+
       if (isHeistInteraction(interaction)) {
         await handleHeistInteraction(interaction);
         return;
@@ -40,11 +51,9 @@ module.exports = {
         return;
       }
 
-      // --- ปุ่มจากแผง (ไม่ใช้ slash) ---
       if (interaction.isButton()) {
         const id = interaction.customId;
 
-        // แจ้งลา → เปิด modal
         if (id === 'leave_request_btn') {
           const modal = new ModalBuilder()
             .setCustomId('leave_request_modal')
@@ -75,13 +84,12 @@ module.exports = {
           return interaction.showModal(modal);
         }
 
-        // เช็คชื่อ
         if (id === 'checkin_join_btn' || id.startsWith('checkin_join_')) {
           const session = getOpenCheckinSession();
           if (!session) {
             return interaction.reply({
               content: 'ตอนนี้ยังไม่มีรอบเช็คชื่อที่เปิดอยู่ — รอแอดมินเปิดรอบก่อน',
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
           }
           ensureUser(
@@ -93,38 +101,35 @@ module.exports = {
           if (!result.success) {
             return interaction.reply({
               content: 'คุณเช็คชื่อไปแล้วในรอบนี้ ✅',
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
           }
           return interaction.reply({
             content: `✅ เช็คชื่อสำเร็จ! รอบ **${session.name}**`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
 
-        // ตัดยอดคะแนน
         if (id === 'weekly_reset_btn') {
           if (!isAdmin(interaction.member)) {
             return interaction.reply({
               content: '❌ เฉพาะแอดมิน',
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
           }
           const cmd = interaction.client.commands.get('weekly_reset');
           if (cmd) return cmd.execute(interaction);
-          return interaction.reply({ content: 'ไม่พบคำสั่ง weekly_reset', ephemeral: true });
+          return interaction.reply({
+            content: 'ไม่พบคำสั่ง weekly_reset',
+            flags: MessageFlags.Ephemeral,
+          });
         }
 
-        // คลัง / แอดมิน — ยังเป็น stub บอกสถานะ
-        if (
-          id === 'storage_withdraw_btn' ||
-          id === 'storage_admin_btn' ||
-          id.startsWith('admin_')
-        ) {
+        if (id === 'storage_withdraw_btn' || id === 'storage_admin_btn') {
           return interaction.reply({
             content:
-              'ระบบนี้กำลังเชื่อมต่อกับแผงปุ่ม — ฟีเจอร์คลัง/ตั้งค่าเต็มรูปแบบจะเปิดใช้ในรอบถัดไป\nตอนนี้ใช้ปุ่ม **เริ่มลงทะเบียน** / **แจ้งลา** / **เช็คชื่อ** ได้ก่อน',
-            ephemeral: true,
+              '📦 ระบบคลัง: ใช้เมนู **คลังแก๊ง** ในแผงแอดมิน หรือรออัปเดตรอบถัดไปสำหรับฟอร์มเบิกของเต็มรูปแบบ',
+            flags: MessageFlags.Ephemeral,
           });
         }
       }
@@ -132,7 +137,7 @@ module.exports = {
       console.error('เกิดข้อผิดพลาดใน interactionCreate:', error);
       const payload = {
         content: 'เกิดข้อผิดพลาดขณะประมวลผล กรุณาลองใหม่นะคับ',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       };
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(payload).catch(() => {});
