@@ -14,6 +14,7 @@ const {
   handleAdminPanel,
 } = require('../interactions/adminPanel');
 const { handleLeaveModal } = require('../commands/leave');
+const { handleRosterRefresh } = require('../panels/rosterPanel');
 const {
   getOpenCheckinSession,
   doCheckin,
@@ -35,7 +36,6 @@ module.exports = {
         return;
       }
 
-      // แผงแอดมิน (ปุ่ม / select / modal)
       if (isAdminPanelInteraction(interaction)) {
         await handleAdminPanel(interaction);
         return;
@@ -53,6 +53,10 @@ module.exports = {
 
       if (interaction.isButton()) {
         const id = interaction.customId;
+
+        if (id === 'roster_refresh_btn') {
+          return handleRosterRefresh(interaction);
+        }
 
         if (id === 'leave_request_btn') {
           const modal = new ModalBuilder()
