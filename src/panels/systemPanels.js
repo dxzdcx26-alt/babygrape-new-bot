@@ -116,29 +116,28 @@ function storagePanel() {
   return { embeds: [embed], components: [row] };
 }
 
-/** แผง #heist-score ตามภาพต้นแบบ */
+/** Control Panel — ข้อความตามต้นฉบับที่ผู้ใช้ส่งมา */
 function adminPanel() {
-  const embed = new EmbedBuilder()
-    .setColor(0x7c3aed)
-    .setDescription(
-      [
-        '🎮 **ระบบกิจกรรม (Activities)**',
-        'จัดการรายชื่อกิจกรรม กำหนดคะแนนและดูประวัติการลงทะเบียน',
-        '',
-        '📅 **ระบบเช็คชื่อ (Check-in)**',
-        'สร้างหัวข้อเช็คชื่อ เปิด-ปิดรอบ และดูรายชื่อผู้ลงชื่อ',
-        '',
-        '👮 **สิทธิ์การใช้งาน (Roles)**',
-        'กำหนด Role Admin / Helper / Member สำหรับจำกัดสิทธิ์การใช้งาน',
-        '',
-        '⚙️ **ตั้งค่าอื่นๆ (Settings)**',
-        'ตั้งเวลาปิดรับการลา แก้ไขคะแนน ดูประวัติย้อนหลัง และอื่นๆ',
-        '',
-        '*Enjoy Managing ! · Baby Grape System 🍇*',
-      ].join('\n'),
-    );
+  const description = [
+    '⸝ **Baby Grape Control Panel** 𓂃 ✿',
+    '﹒ 🍇﹕ ✼ ﹒ **Admin Zone !**   ♡   ยินดีต้อนรับสู่หลังบ้านของ Baby Grape นะคะ   ⋆   ⁺',
+    '☁️ ﹒ กรุณาเลือกเมนูที่ต้องการตั้งค่าด้านล่าง',
+    '',
+    '╭ ꔫ ﹒ 📍 **ระบบห้อง**  (Channels)',
+    '˙ ╰ ┈ ‧₊˚ ตั้งค่าห้องวางปุ่มและ Panel (แจ้งลา / กิจกรรม / เช็คชื่อ / Leaderboard / Log)',
+    '╭ ꔫ ﹒ 🎮 **ระบบกิจกรรม**  (Activities)',
+    '˙ ╰ ┈ ‧₊˚ จัดการรายชื่อกิจกรรม กำหนดคะแนน และดูประวัติการลงทะเบียน',
+    '╭ ꔫ ﹒ 📅 **ระบบเช็คชื่อ**  (Check-in)',
+    '˙ ╰ ┈ ‧₊˚ สร้างหัวข้อเช็คชื่อ เปิด-ปิดรอบ และดูรายชื่อผู้ลงชื่อ',
+    '╭ ꔫ ﹒ 👮 **สิทธิ์การใช้งาน**  (Roles)',
+    '˙ ╰ ┈ ‧₊˚ กำหนด Role Admin / Helper / Member สำหรับจำกัดสิทธิ์การใช้งาน',
+    '╭ ꔫ ﹒ ⚙️ **ตั้งค่าอื่นๆ**  (Settings)',
+    '˙ ╰ ┈ ‧₊˚ ตั้งเวลาปิดรับการลา แก้ไขคะแนน ดูประวัติย้อนหลัง และอื่นๆ',
+    '☁️ ⁺ ˖ ⸝⸝ Enjoy Managing  !   ‧   Baby Grape System   🍇   ⋆ ♡ ˊ ˎ -',
+  ].join('\n');
 
-  // แถวปุ่มตามภาพ
+  const embed = new EmbedBuilder().setColor(0x7c3aed).setDescription(description);
+
   const rows = [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -251,7 +250,6 @@ async function sendAllPanels(guild, channels) {
     }
   }
 
-  // แผง setup หลัก = #heist-score ตามภาพ
   const adminCh = channels.admin || channels.log || channels.control;
   await post(adminCh, adminPanel(), 'แผงจัดการ (heist-score)');
 
