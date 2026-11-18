@@ -8,20 +8,71 @@ const { setSetting } = require('../database');
 const { sendAllPanels } = require('../panels/systemPanels');
 const { isAdmin } = require('../utils/permissions');
 
-/** ชื่อห้องสไตล์ Baby Grape */
+/**
+ * ชื่อห้องสไตล์ Baby Grape
+ * ใช้ Unicode สัญลักษณ์ + จุดคั่น (Discord รองรับ)
+ * หมายเหตุ: ภาษาไทยไม่มีฟอนต์พิเศษใน Unicode มากนัก จึงเน้นอิโมจิ + สัญลักษณ์ตกแต่ง
+ */
 const CHANNELS = {
-  control: { name: '📝・ลงทะเบียนกิจกรรม', aliases: ['ลงทะเบียนกิจกรรม', 'ลงทะเบียน'], topic: 'ปุ่มลงทะเบียนกิจกรรม / Heist Report' },
-  leave: { name: '✈️・แจ้งลา', aliases: ['แจ้งลา'], topic: 'ระบบแจ้งลา' },
-  checkin: { name: '📌・เช็คชื่อ', aliases: ['เช็คชื่อ'], topic: 'ระบบเช็คชื่อ' },
-  delivery: { name: '📦・ส่งของ', aliases: ['ส่งของ'], topic: 'ระบบส่งของ' },
-  storage: { name: '🏭・คลังของแก๊ง', aliases: ['คลังของแก๊ง', 'คลัง'], topic: 'คลังของแก๊ง' },
-  score: { name: '📊・ตารางคะแนน', aliases: ['ตารางคะแนน'], topic: 'กระดานคะแนน Weekly / Monthly' },
-  leaveSummary: { name: '📋・สรุปคนลา', aliases: ['สรุปคนลา'], topic: 'สรุปรายงานการลา' },
-  checkinSummary: { name: '✅・สรุปเช็คชื่อ', aliases: ['สรุปเช็คชื่อ'], topic: 'สรุปรายชื่อเช็คชื่อ' },
-  log: { name: '📜・ประวัติ-log', aliases: ['ประวัติ-log', 'ประวัติ'], topic: 'Log รายงานกิจกรรม' },
-  admin: { name: '🎛️・heist-score', aliases: ['heist-score'], topic: 'แผงจัดการระบบ Baby Grape' },
-  chat: { name: '💬・heist-chat', aliases: ['heist-chat', 'กิจกรรม-แชท', 'แชทกิจกรรม'], topic: 'แชทกิจกรรม — รีเซ็ตเข้ากรุทุก 3 วัน' },
+  control: {
+    name: '📝 ‧ ลงทะเบียนกิจกรรม',
+    aliases: ['ลงทะเบียนกิจกรรม', 'ลงทะเบียน', '📝'],
+    topic: '₊˚ ปุ่มลงทะเบียนกิจกรรม / Heist Report ‧₊˚',
+  },
+  leave: {
+    name: '✈️ ‧ แจ้งลา',
+    aliases: ['แจ้งลา', '✈️'],
+    topic: '₊˚ ระบบแจ้งลา ‧₊˚',
+  },
+  checkin: {
+    name: '📌 ‧ เช็คชื่อ',
+    aliases: ['เช็คชื่อ', '📌'],
+    topic: '₊˚ ระบบเช็คชื่อ ‧₊˚',
+  },
+  delivery: {
+    name: '📦 ‧ ส่งของ',
+    aliases: ['ส่งของ', '📦'],
+    topic: '₊˚ ระบบส่งของ ‧₊˚',
+  },
+  storage: {
+    name: '🏭 ‧ คลังของแก๊ง',
+    aliases: ['คลังของแก๊ง', 'คลัง', '🏭'],
+    topic: '₊˚ คลังของแก๊ง ‧₊˚',
+  },
+  score: {
+    name: '📊 ‧ ตารางคะแนน',
+    aliases: ['ตารางคะแนน', '📊'],
+    topic: '₊˚ กระดานคะแนน Weekly / Monthly ‧₊˚',
+  },
+  leaveSummary: {
+    name: '📋 ‧ สรุปคนลา',
+    aliases: ['สรุปคนลา', '📋'],
+    topic: '₊˚ สรุปรายงานการลา ‧₊˚',
+  },
+  checkinSummary: {
+    name: '✅ ‧ สรุปเช็คชื่อ',
+    aliases: ['สรุปเช็คชื่อ', '✅'],
+    topic: '₊˚ สรุปรายชื่อเช็คชื่อ ‧₊˚',
+  },
+  log: {
+    name: '📜 ‧ ประวัติ˗log',
+    aliases: ['ประวัติ-log', 'ประวัติ', '📜'],
+    topic: '₊˚ Log รายงานกิจกรรม ‧₊˚',
+  },
+  admin: {
+    name: '🎛️ ‧ heist˗score',
+    aliases: ['heist-score', 'heist˗score', '🎛️'],
+    topic: '₊˚ แผงจัดการระบบ Baby Grape ‧₊˚',
+  },
+  chat: {
+    name: '💬 ‧ heist˗chat',
+    aliases: ['heist-chat', 'กิจกรรม-แชท', 'แชทกิจกรรม', '💬'],
+    topic: '₊˚ แชทกิจกรรม — รีเซ็ตเข้ากรุทุก 3 วัน ‧₊˚',
+  },
 };
+
+const CATEGORY_SYSTEM = '🍇 ‧ BABY GRAPE SYSTEM';
+const CATEGORY_ARCHIVE = '🗄️ ‧ heist˗archive';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -37,7 +88,7 @@ module.exports = {
     .addBooleanOption((opt) =>
       opt
         .setName('rename')
-        .setDescription('เปลี่ยนชื่อห้องเดิมให้มีอิโมจิสวย ๆ')
+        .setDescription('เปลี่ยนชื่อห้องเดิมให้สวยขึ้น (default: เปิด)')
         .setRequired(false),
     ),
 
@@ -57,9 +108,8 @@ module.exports = {
     }
 
     const force = interaction.options.getBoolean('force') || false;
-    const doRename = interaction.options.getBoolean('rename') !== false; // default true-ish when set; if null still rename found
-    const rename = interaction.options.getBoolean('rename');
-    const shouldRename = rename === null || rename === true;
+    const renameOpt = interaction.options.getBoolean('rename');
+    const shouldRename = renameOpt === null || renameOpt === true;
 
     const created = [];
     const reused = [];
@@ -101,7 +151,6 @@ module.exports = {
             aliases.some((a) => c.name === a || c.name.includes(a))) &&
           (!parent || c.parentId === parent.id || !c.parentId),
       );
-      // หาทั้งเซิร์ฟถ้าไม่เจอในหมวด
       if (!existing) {
         existing = guild.channels.cache.find(
           (c) =>
@@ -114,7 +163,7 @@ module.exports = {
         if (shouldRename && existing.name !== name) {
           try {
             await existing.setName(name, 'BabyGrape pretty name');
-            renamed.push(`#${existing.name} → ${name}`);
+            renamed.push(`→ ${name}`);
           } catch (e) {
             console.warn('rename failed', e.message);
           }
@@ -122,6 +171,13 @@ module.exports = {
         if (parent && existing.parentId !== parent.id) {
           try {
             await existing.setParent(parent.id, { reason: 'BabyGrape setup' });
+          } catch {
+            /* ignore */
+          }
+        }
+        if (topic && existing.topic !== topic) {
+          try {
+            await existing.setTopic(topic);
           } catch {
             /* ignore */
           }
@@ -142,8 +198,12 @@ module.exports = {
     }
 
     try {
-      const archiveCat = await findOrCreateCategory('🗄️ heist-archive', ['heist-archive', 'archive']);
-      const systemCat = await findOrCreateCategory('🍇 BABY GRAPE SYSTEM', [
+      const archiveCat = await findOrCreateCategory(CATEGORY_ARCHIVE, [
+        'heist-archive',
+        'heist˗archive',
+        'archive',
+      ]);
+      const systemCat = await findOrCreateCategory(CATEGORY_SYSTEM, [
         'BABY GRAPE',
         'Baby Grape',
       ]);
@@ -193,27 +253,27 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setColor(0x8b5cf6)
-        .setTitle('✅ Setup เสร็จ — ห้องสวยพร้อมแผงแล้ว')
+        .setTitle('✨ Setup เสร็จ — ห้องสวยพร้อมแผงแล้ว')
         .setDescription(
           [
             created.length
-              ? `**สร้างใหม่:**\n${created.map((x) => `• ${x}`).join('\n')}`
+              ? `**สร้างใหม่**\n${created.map((x) => `✦ ${x}`).join('\n')}`
               : null,
             renamed.length
-              ? `**เปลี่ยนชื่อ:**\n${renamed.map((x) => `• ${x}`).join('\n')}`
+              ? `**เปลี่ยนชื่อ**\n${renamed.map((x) => `✧ ${x}`).join('\n')}`
               : null,
             reused.length && !renamed.length
-              ? `**ใช้ของเดิม:**\n${reused.map((x) => `• ${x}`).join('\n')}`
+              ? `**ใช้ของเดิม**\n${reused.map((x) => `• ${x}`).join('\n')}`
               : null,
             '',
-            'แผงจัดการอยู่ที่ **🎛️・heist-score**',
+            '₊˚ แผงจัดการอยู่ที่ **🎛️ ‧ heist˗score** ‧₊˚',
           ]
             .filter(Boolean)
             .join('\n'),
         )
         .addFields(
           {
-            name: 'แผงที่ส่งแล้ว',
+            name: '‧ แผงที่ส่งแล้ว',
             value:
               (panelResults || [])
                 .slice(0, 12)
@@ -221,10 +281,11 @@ module.exports = {
                 .join('\n') || '—',
           },
           {
-            name: 'Channel IDs',
+            name: '‧ Channel IDs',
             value: '```env\n' + envBlock.slice(0, 900) + '\n```',
           },
         )
+        .setFooter({ text: 'Baby Grape System ‧ setup' })
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
