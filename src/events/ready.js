@@ -23,12 +23,21 @@ module.exports = {
     cron.schedule(
       config.archiveCron,
       () => {
+        if (!config.channels?.target || !config.channels?.archiveCategory) {
+          return;
+        }
         archiveAndCreateNewChannel(client);
       },
       { scheduled: true, timezone: config.timezone },
     );
-    console.log(`ตั้งเวลาระบบเก็บห้องแชทเรียบร้อย! (${config.archiveCron} ${config.timezone})`);
+    console.log(
+      `ตั้งเวลาระบบเก็บห้องแชทเรียบร้อย! (${config.archiveCron} ${config.timezone})`,
+    );
 
-    await updateScoreboard(client);
+    if (config.channels?.score) {
+      await updateScoreboard(client);
+    } else {
+      console.log('ยังไม่มี SCORE_CHANNEL_ID — รัน /setup เพื่อสร้างห้องและแผง');
+    }
   },
 };
