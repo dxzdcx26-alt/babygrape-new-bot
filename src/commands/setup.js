@@ -6,7 +6,22 @@ const {
 } = require('discord.js');
 const { setSetting } = require('../database');
 const { sendAllPanels } = require('../panels/systemPanels');
-const { isAdmin, hasAdministrator } = require('../utils/permissions');
+const { isAdmin } = require('../utils/permissions');
+
+/** ชื่อห้องสไตล์ Baby Grape */
+const CHANNELS = {
+  control: { name: '📝・ลงทะเบียนกิจกรรม', aliases: ['ลงทะเบียนกิจกรรม', 'ลงทะเบียน'], topic: 'ปุ่มลงทะเบียนกิจกรรม / Heist Report' },
+  leave: { name: '✈️・แจ้งลา', aliases: ['แจ้งลา'], topic: 'ระบบแจ้งลา' },
+  checkin: { name: '📌・เช็คชื่อ', aliases: ['เช็คชื่อ'], topic: 'ระบบเช็คชื่อ' },
+  delivery: { name: '📦・ส่งของ', aliases: ['ส่งของ'], topic: 'ระบบส่งของ' },
+  storage: { name: '🏭・คลังของแก๊ง', aliases: ['คลังของแก๊ง', 'คลัง'], topic: 'คลังของแก๊ง' },
+  score: { name: '📊・ตารางคะแนน', aliases: ['ตารางคะแนน'], topic: 'กระดานคะแนน Weekly / Monthly' },
+  leaveSummary: { name: '📋・สรุปคนลา', aliases: ['สรุปคนลา'], topic: 'สรุปรายงานการลา' },
+  checkinSummary: { name: '✅・สรุปเช็คชื่อ', aliases: ['สรุปเช็คชื่อ'], topic: 'สรุปรายชื่อเช็คชื่อ' },
+  log: { name: '📜・ประวัติ-log', aliases: ['ประวัติ-log', 'ประวัติ'], topic: 'Log รายงานกิจกรรม' },
+  admin: { name: '🎛️・heist-score', aliases: ['heist-score'], topic: 'แผงจัดการระบบ Baby Grape' },
+  chat: { name: '💬・heist-chat', aliases: ['heist-chat', 'กิจกรรม-แชท', 'แชทกิจกรรม'], topic: 'แชทกิจกรรม — รีเซ็ตเข้ากรุทุก 3 วัน' },
+};
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -17,6 +32,12 @@ module.exports = {
       opt
         .setName('force')
         .setDescription('สร้างใหม่แม้มีชื่อห้องซ้ำแล้ว')
+        .setRequired(false),
+    )
+    .addBooleanOption((opt) =>
+      opt
+        .setName('rename')
+        .setDescription('เปลี่ยนชื่อห้องเดิมให้มีอิโมจิสวย ๆ')
         .setRequired(false),
     ),
 
@@ -36,17 +57,30 @@ module.exports = {
     }
 
     const force = interaction.options.getBoolean('force') || false;
-    const me = guild.members.me;
+    const doRename = interaction.options.getBoolean('rename') !== false; // default true-ish when set; if null still rename found
+    const rename = interaction.options.getBoolean('rename');
+    const shouldRename = rename === null || rename === true;
 
     const created = [];
     const reused = [];
+    const renamed = [];
 
-    async function findOrCreateCategory(name) {
+    async function findOrCreateCategory(name, aliases = []) {
       let cat = guild.channels.cache.find(
-        (c) => c.type === ChannelType.GuildCategory && c.name === name,
+        (c) =>
+          c.type === ChannelType.GuildCategory &&
+          (c.name === name || aliases.some((a) => c.name.includes(a))),
       );
       if (cat && !force) {
-        reused.push(`หมวด ${name}`);
+        if (shouldRename && cat.name !== name) {
+          try {
+            await cat.setName(name, 'BabyGrape rename');
+            renamed.push(`หมวด → ${name}`);
+          } catch (e) {
+            console.warn('rename category failed', e.message);
+          }
+        }
+        reused.push(`หมวด ${cat.name}`);
         return cat;
       }
       cat = await guild.channels.create({
@@ -58,17 +92,44 @@ module.exports = {
       return cat;
     }
 
-    async function findOrCreateText(name, parent, topic) {
-      const existing = guild.channels.cache.find(
+    async function findOrCreateText(def, parent) {
+      const { name, aliases = [], topic } = def;
+      let existing = guild.channels.cache.find(
         (c) =>
           c.type === ChannelType.GuildText &&
-          c.name === name &&
-          (!parent || c.parentId === parent.id),
+          (c.name === name ||
+            aliases.some((a) => c.name === a || c.name.includes(a))) &&
+          (!parent || c.parentId === parent.id || !c.parentId),
       );
-      if (existing) {
-        reused.push(`#${name}`);
+      // หาทั้งเซิร์ฟถ้าไม่เจอในหมวด
+      if (!existing) {
+        existing = guild.channels.cache.find(
+          (c) =>
+            c.type === ChannelType.GuildText &&
+            (c.name === name || aliases.some((a) => c.name === a || c.name.includes(a))),
+        );
+      }
+
+      if (existing && !force) {
+        if (shouldRename && existing.name !== name) {
+          try {
+            await existing.setName(name, 'BabyGrape pretty name');
+            renamed.push(`#${existing.name} → ${name}`);
+          } catch (e) {
+            console.warn('rename failed', e.message);
+          }
+        }
+        if (parent && existing.parentId !== parent.id) {
+          try {
+            await existing.setParent(parent.id, { reason: 'BabyGrape setup' });
+          } catch {
+            /* ignore */
+          }
+        }
+        reused.push(`#${existing.name}`);
         return existing;
       }
+
       const ch = await guild.channels.create({
         name,
         type: ChannelType.GuildText,
@@ -81,41 +142,23 @@ module.exports = {
     }
 
     try {
-      const archiveCat = await findOrCreateCategory('heist-archive');
-      const systemCat = await findOrCreateCategory('🍇 BABY GRAPE SYSTEM');
+      const archiveCat = await findOrCreateCategory('🗄️ heist-archive', ['heist-archive', 'archive']);
+      const systemCat = await findOrCreateCategory('🍇 BABY GRAPE SYSTEM', [
+        'BABY GRAPE',
+        'Baby Grape',
+      ]);
 
-      const control = await findOrCreateText(
-        'ลงทะเบียนกิจกรรม',
-        systemCat,
-        'ปุ่มลงทะเบียนกิจกรรม',
-      );
-      const leaveCh = await findOrCreateText('แจ้งลา', systemCat, 'แจ้งลา');
-      const checkinCh = await findOrCreateText('เช็คชื่อ', systemCat, 'เช็คชื่อ');
-      await findOrCreateText('ส่งของ', systemCat, 'ส่งของ');
-      const storageCh = await findOrCreateText('คลังของแก๊ง', systemCat, 'คลังของแก๊ง');
-      const score = await findOrCreateText('ตารางคะแนน', systemCat, 'กระดานคะแนน');
-      await findOrCreateText('สรุปคนลา', systemCat, 'สรุปรายงานการลา');
-      await findOrCreateText('สรุปเช็คชื่อ', systemCat, 'สรุปรายชื่อเช็คชื่อ');
-      const log = await findOrCreateText('ประวัติ-log', systemCat, 'Log');
-      // แผง setup หลักตามภาพ
-      const adminCh = await findOrCreateText('heist-score', systemCat, 'แผงจัดการระบบ');
-
-      let target = guild.channels.cache.find(
-        (c) =>
-          c.type === ChannelType.GuildText &&
-          (c.name === 'heist-chat' ||
-            c.name === 'กิจกรรม-แชท' ||
-            c.name === 'แชทกิจกรรม'),
-      );
-      if (!target) {
-        target = await findOrCreateText(
-          'heist-chat',
-          systemCat,
-          'ห้องแชทกิจกรรม — รีเซ็ตเข้ากรุทุก 3 วัน',
-        );
-      } else {
-        reused.push(`#${target.name}`);
-      }
+      const control = await findOrCreateText(CHANNELS.control, systemCat);
+      const leaveCh = await findOrCreateText(CHANNELS.leave, systemCat);
+      const checkinCh = await findOrCreateText(CHANNELS.checkin, systemCat);
+      await findOrCreateText(CHANNELS.delivery, systemCat);
+      const storageCh = await findOrCreateText(CHANNELS.storage, systemCat);
+      const score = await findOrCreateText(CHANNELS.score, systemCat);
+      await findOrCreateText(CHANNELS.leaveSummary, systemCat);
+      await findOrCreateText(CHANNELS.checkinSummary, systemCat);
+      const log = await findOrCreateText(CHANNELS.log, systemCat);
+      const adminCh = await findOrCreateText(CHANNELS.admin, systemCat);
+      const target = await findOrCreateText(CHANNELS.chat, systemCat);
 
       const mapping = {
         GUILD_ID: guild.id,
@@ -149,19 +192,21 @@ module.exports = {
         .join('\n');
 
       const embed = new EmbedBuilder()
-        .setColor('Green')
-        .setTitle('✅ Setup เสร็จ — ดูแผงที่ #heist-score')
+        .setColor(0x8b5cf6)
+        .setTitle('✅ Setup เสร็จ — ห้องสวยพร้อมแผงแล้ว')
         .setDescription(
           [
             created.length
               ? `**สร้างใหม่:**\n${created.map((x) => `• ${x}`).join('\n')}`
               : null,
-            reused.length
+            renamed.length
+              ? `**เปลี่ยนชื่อ:**\n${renamed.map((x) => `• ${x}`).join('\n')}`
+              : null,
+            reused.length && !renamed.length
               ? `**ใช้ของเดิม:**\n${reused.map((x) => `• ${x}`).join('\n')}`
               : null,
             '',
-            'แผงจัดการอยู่ที่ **#heist-score** (ตั้งค่าห้อง / กิจกรรม / เช็คชื่อ / ยศ ฯลฯ)',
-            'ห้องอื่นมีปุ่มใช้งานแล้ว — ไม่ต้องจำ slash command',
+            'แผงจัดการอยู่ที่ **🎛️・heist-score**',
           ]
             .filter(Boolean)
             .join('\n'),
