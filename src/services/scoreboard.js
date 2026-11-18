@@ -8,8 +8,14 @@ const config = require('../config');
 
 async function updateScoreboard(client) {
   try {
+    const scoreChannelId = config.channels?.score;
+    if (!scoreChannelId) {
+      console.log('ข้ามกระดานคะแนน: ยังไม่มี SCORE_CHANNEL_ID (รัน /setup ก่อน)');
+      return;
+    }
+
     const scores = getScores();
-    const channel = await client.channels.fetch(config.channels.score);
+    const channel = await client.channels.fetch(scoreChannelId).catch(() => null);
     if (!channel) {
       console.error('ไม่พบห้อง scoreChannelId!');
       return;
@@ -91,7 +97,9 @@ async function upsertLeaderboard(client, channel, type, embed) {
           msg.author.id === client.user.id &&
           msg.embeds[0]?.title?.includes(keyword),
       );
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   }
 
   if (message) {
