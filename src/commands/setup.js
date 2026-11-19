@@ -299,9 +299,7 @@ module.exports = {
       await findOrCreateText(CHANNELS.checkinSummary, systemCat);
       const rosterCh = await findOrCreateText(CHANNELS.roster, systemCat);
       const log = await findOrCreateText(CHANNELS.log, systemCat);
-      // ไม่สร้าง: ตารางคะแนน / คลัง / heist-score / heist-chat
 
-      // หมวดเห็นเฉพาะยศ BG
       try {
         const overwrites = [{ id: guild.id, deny: [PermissionFlagsBits.ViewChannel] }];
         for (const role of [adminRole, helperRole, memberRole]) {
@@ -368,7 +366,7 @@ module.exports = {
         delivery: deliveryCh,
         score: null,
         log,
-        admin: null,
+        admin: log,
       });
 
       try {
@@ -394,9 +392,9 @@ module.exports = {
             created.length ? `**สร้าง**\n${created.map((x) => `✦ ${x}`).join('\n')}` : null,
             reused.length ? `**ใช้ของเดิม**\n${reused.map((x) => `• ${x}`).join('\n')}` : null,
             roleLine ? `₊˚ ยศ: ${roleLine}` : null,
-            '₊˚ **ไม่สร้าง** ตารางคะแนน / ตัดยอด / แผงแอดมิน / คลัง / heist-score',
+            '₊˚ **ไม่สร้าง** ตารางคะแนน / ตัดยอด / คลัง / heist-score',
+            '₊˚ แผงแอดมิน **Control Panel** อยู่ที่ประวัติ-log',
             '₊˚ หมวดเห็นเฉพาะยศ BG',
-            '₊˚ แผง: ลงทะเบียน · แจ้งลา · เช็คชื่อ · ส่งของ · รายชื่อ',
           ]
             .filter(Boolean)
             .join('\n'),
