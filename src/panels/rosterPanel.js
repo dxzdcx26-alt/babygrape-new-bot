@@ -5,7 +5,6 @@ const {
   ButtonStyle,
 } = require('discord.js');
 
-/** แผงรายชื่อสมาชิก */
 function rosterPanel(memberLines = []) {
   const list =
     memberLines.length > 0
@@ -41,12 +40,11 @@ function rosterPanel(memberLines = []) {
   return { embeds: [embed], components: [row] };
 }
 
-/** ดึงรายชื่อจาก guild (พยายาม fetch) */
 async function buildMemberLines(guild) {
   try {
-    await guild.members.fetch({ withPresences: false }).catch(() => null);
+    await guild.members.fetch({ withPresences: false });
   } catch {
-    /* ไม่มี Privileged Intent ก็ใช้ cache */
+    /* cache only if no privileged intent */
   }
 
   const members = [...guild.members.cache.values()]
@@ -70,12 +68,27 @@ async function sendRosterPanel(channel, guild) {
 }
 
 async function handleRosterRefresh(interaction) {
-  const lines = await buildMemberLines(interaction.guild);
-  const payload = rosterPanel(lines);
-  if (interaction.message && interaction.message.editable) {
-    await interaction.update(payload);
-  } else {
-    await interaction.reply({ ...payload, ephemeral: true });
+  // ต้องตอบภายใน 3 วินาที — defer ก่อนค่อย fetch สมาชิก
+  try {
+    await interaction.deferUpdate();
+  } catch (e) {
+    console.warn('roster defer failed:', e.message);
+    return;
+  }
+
+  try {
+    const lines = await buildMemberLines(interaction.guild);
+    await interaction.editReply(rosterPanel(lines));
+  } catch (e) {
+    console.error('roster refresh failed:', e.message);
+    try {
+      await interaction.followUp({
+        content: 'รีเฟรชรายชื่อไม่สำเร็จ: ' + e.message,
+        ephemeral: true,
+      });
+    } catch {
+      /* ignore */
+    }
   }
 }
 
