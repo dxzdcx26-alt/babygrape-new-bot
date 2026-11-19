@@ -29,18 +29,13 @@ const { isAdmin } = require('../utils/permissions');
 async function safeError(interaction, err) {
   console.error('interaction error:', err?.message || err);
   const payload = {
-    content: `เกิดข้อผิดพลาด: ${err?.message || 'unknown'}\nลองกดใหม่ หรือให้แอดมินรัน /setup เพื่อส่งแผงใหม่`,
+    content: `เกิดข้อผิดพลาด: ${err?.message || 'unknown'}\nลองใหม่ หรือให้แอดมินรัน /setup`,
     flags: MessageFlags.Ephemeral,
   };
   try {
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(payload);
-    } else if (interaction.isRepliable()) {
-      await interaction.reply(payload);
-    }
-  } catch {
-    /* ignore */
-  }
+    if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
+    else if (interaction.isRepliable()) await interaction.reply(payload);
+  } catch { /* ignore */ }
 }
 
 module.exports = {
@@ -88,7 +83,8 @@ module.exports = {
           return handleRosterRefresh(interaction);
         }
 
-        if (id === 'leave_request_btn') {
+        // รองรับทั้งแผง mYgang และ baby grape เดิม
+        if (id === 'leave_request_btn' || id === 'leave_open_modal') {
           const modal = new ModalBuilder()
             .setCustomId('leave_request_modal')
             .setTitle('แจ้งลา');
@@ -118,7 +114,7 @@ module.exports = {
           return interaction.showModal(modal);
         }
 
-        if (id === 'checkin_join_btn' || id.startsWith('checkin_join_')) {
+        if (id === 'checkin_join_btn' || id === 'checkin_start' || id.startsWith('checkin_join_')) {
           const session = getOpenCheckinSession();
           if (!session) {
             return interaction.reply({
@@ -144,37 +140,44 @@ module.exports = {
           });
         }
 
-        if (id === 'weekly_reset_btn') {
+        if (id === 'weekly_reset_btn' || id === 'leaderboard_reset') {
           if (!isAdmin(interaction.member)) {
             return interaction.reply({
               content: '❌ เฉพาะแอดมิน',
               flags: MessageFlags.Ephemeral,
             });
           }
+          const { weeklyReset } = require('../database');
+          const { updateScoreboard } = require('../services/scoreboard');
+          weeklyReset(interaction.user.id);
+          await updateScoreboard(interaction.client).catch(() => {});
           return interaction.reply({
-            content:
-              'ตัดยอดคะแนน: ใช้ปุ่มในห้องตารางคะแนนหลัง setup หรือรออัปเดต\n(คำสั่ง /weekly_reset ถูกปิดแล้ว — เหลือแค่ /setup)',
+            content: '✅ ตัดยอดคะแนนรายสัปดาห์แล้ว (โอนเข้า monthly)',
             flags: MessageFlags.Ephemeral,
           });
         }
 
-        // ปุ่มจากแผงเก่า / ไม่รู้จัก → ต้องตอบเสมอ ไม่งั้นขึ้น 404
         console.warn('Unhandled button:', id, 'by', interaction.user.tag);
         return interaction.reply({
           content:
-            'ปุ่มนี้จาก**แผงเก่า**หรือยังไม่รองรับ\n' +
-            'ให้แอดมินรัน `/setup` เพื่อส่งแผงใหม่ แล้วใช้ปุ่มจากข้อความล่าสุด',
+            'ปุ่มนี้ยังไม่รองรับหรือเป็นแผงเก่า\n' +
+            'ลองใช้ปุ่มจากข้อความของ **mYgang** หรือให้แอดมินรัน `/setup`',
           flags: MessageFlags.Ephemeral,
         });
       }
 
-      if (interaction.isModalSubmit() || interaction.isAnySelectMenu?.() || interaction.isStringSelectMenu?.()) {
-        console.warn('Unhandled interaction:', interaction.customId);
+      if (
+        interaction.isModalSubmit() ||
+        interaction.isStringSelectMenu?.() ||
+        interaction.isUserSelectMenu?.()
+      ) {
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({
-            content: 'การกระทำนี้ยังไม่รองรับ หรือแผงเก่าเกินไป — รัน `/setup` ใหม่',
-            flags: MessageFlags.Ephemeral,
-          }).catch(() => {});
+          await interaction
+            .reply({
+              content: 'การกระทำนี้ยังไม่รองรับ — รัน `/setup` ใหม่',
+              flags: MessageFlags.Ephemeral,
+            })
+            .catch(() => {});
         }
       }
     } catch (error) {
