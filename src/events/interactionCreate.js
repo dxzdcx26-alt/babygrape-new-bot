@@ -26,6 +26,23 @@ const {
 } = require('../database');
 const { isAdmin } = require('../utils/permissions');
 
+async function safeError(interaction, err) {
+  console.error('interaction error:', err?.message || err);
+  const payload = {
+    content: `เกิดข้อผิดพลาด: ${err?.message || 'unknown'}\nลองกดใหม่ หรือให้แอดมินรัน /setup เพื่อส่งแผงใหม่`,
+    flags: MessageFlags.Ephemeral,
+  };
+  try {
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(payload);
+    } else if (interaction.isRepliable()) {
+      await interaction.reply(payload);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction) {
@@ -33,8 +50,12 @@ module.exports = {
       if (interaction.isChatInputCommand()) {
         const command = interaction.client.commands.get(interaction.commandName);
         if (!command) {
-          console.warn(`No handler for /${interaction.commandName}`);
-          return;
+          return interaction
+            .reply({
+              content: 'คำสั่งนี้ปิดใช้งานแล้ว — ใช้แผงปุ่มหรือ `/setup`',
+              flags: MessageFlags.Ephemeral,
+            })
+            .catch(() => {});
         }
         await command.execute(interaction);
         return;
@@ -61,7 +82,7 @@ module.exports = {
       }
 
       if (interaction.isButton()) {
-        const id = interaction.customId;
+        const id = interaction.customId || '';
 
         if (id === 'roster_refresh_btn') {
           return handleRosterRefresh(interaction);
@@ -130,25 +151,34 @@ module.exports = {
               flags: MessageFlags.Ephemeral,
             });
           }
-          const cmd = interaction.client.commands.get('weekly_reset');
-          if (cmd) return cmd.execute(interaction);
           return interaction.reply({
-            content: 'ไม่พบคำสั่ง weekly_reset',
+            content:
+              'ตัดยอดคะแนน: ใช้ปุ่มในห้องตารางคะแนนหลัง setup หรือรออัปเดต\n(คำสั่ง /weekly_reset ถูกปิดแล้ว — เหลือแค่ /setup)',
             flags: MessageFlags.Ephemeral,
           });
         }
+
+        // ปุ่มจากแผงเก่า / ไม่รู้จัก → ต้องตอบเสมอ ไม่งั้นขึ้น 404
+        console.warn('Unhandled button:', id, 'by', interaction.user.tag);
+        return interaction.reply({
+          content:
+            'ปุ่มนี้จาก**แผงเก่า**หรือยังไม่รองรับ\n' +
+            'ให้แอดมินรัน `/setup` เพื่อส่งแผงใหม่ แล้วใช้ปุ่มจากข้อความล่าสุด',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      if (interaction.isModalSubmit() || interaction.isAnySelectMenu?.() || interaction.isStringSelectMenu?.()) {
+        console.warn('Unhandled interaction:', interaction.customId);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: 'การกระทำนี้ยังไม่รองรับ หรือแผงเก่าเกินไป — รัน `/setup` ใหม่',
+            flags: MessageFlags.Ephemeral,
+          }).catch(() => {});
+        }
       }
     } catch (error) {
-      console.error('เกิดข้อผิดพลาดใน interactionCreate:', error);
-      const payload = {
-        content: 'เกิดข้อผิดพลาดขณะประมวลผล กรุณาลองใหม่นะคับ',
-        flags: MessageFlags.Ephemeral,
-      };
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(payload).catch(() => {});
-      } else {
-        await interaction.reply(payload).catch(() => {});
-      }
+      await safeError(interaction, error);
     }
   },
 };
