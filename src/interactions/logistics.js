@@ -20,6 +20,10 @@ const {
 const { isAdmin } = require('../utils/permissions');
 const config = require('../config');
 
+/** userId → { item, qty, dest, channelId, expires } รออัปโหลดรูป */
+const pendingDeliveryProof = new Map();
+const pendingWithdrawProof = new Map();
+
 function isLogisticsInteraction(interaction) {
   const id = (interaction.customId || '').toLowerCase();
   if (!id) return false;
@@ -79,10 +83,7 @@ function formatRecentDeliveries(limit = 5) {
     return rows
       .map((r, i) => {
         const when = r.created_at || '';
-        return (
-          `**${i + 1}.** ${r.item_name} × ${r.quantity} → ${r.destination}\n` +
-          ` โดย <@${r.user_id}> · ${when}`
-        );
+        return `**${i + 1}.** ${r.item_name} × ${r.quantity} → ${r.destination}\n โดย <@${r.user_id}> · ${when}`;
       })
       .join('\n');
   } catch {
@@ -98,10 +99,11 @@ function deliveryPanel() {
       [
         '**ระบบส่งของ**',
         '',
-        '**Guideline**',
-        '• กรอกชื่อของ / จำนวน / จุดส่ง',
-        '• แนบลิงก์รูปหลักฐานทุกครั้ง',
-        '• ระบบบันทึกแล้ว**ส่งเข้าห้องประวัติ-log** อัตโนมัติ',
+        '**วิธีใช้**',
+        '1. กดปุ่มด้านล่าง',
+        '2. กรอก **ชนิดของ** / **จำนวน** / จุดส่ง',
+        '3. **ส่งรูป snap** ในห้องนี้เป็นหลักฐาน (ภายใน 60 วินาที)',
+        '4. ระบบบันทึกแล้วส่งเข้า **ประวัติ-log**',
         '',
         '**รายการล่าสุด**',
         formatRecentDeliveries(5),
@@ -109,7 +111,7 @@ function deliveryPanel() {
         '*Safe delivery · Baby Grape System 🍇*',
       ].join('\n'),
     )
-    .setFooter({ text: 'ข้อมูลประวัติอ่านจากระบบส่งของ' })
+    .setFooter({ text: 'หลักฐาน = รูปจาก snap / แคปหน้าจอ' })
     .setTimestamp();
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -131,9 +133,8 @@ function storagePanelLive() {
         formatStock(),
         '',
         '**วิธีใช้งาน**',
-        '• กดปุ่ม "เบิกของ" เพื่อเบิกของจากคลัง',
-        '• ต้องใส่ลิงก์รูปหลักฐาน ทุกครั้ง',
-        '• แอดมินใช้ "จัดการคลัง" เพื่อเพิ่ม/ตั้งยอด',
+        '• กด "เบิกของ" → กรอกชนิดของ / จำนวน → ส่งรูป snap',
+        '• แอดมินใช้ "จัดการคลัง" เพื่อตั้งยอด',
         '',
         `*Updated: ${new Date().toLocaleString('th-TH')} · Baby Grape System 🍇*`,
       ].join('\n'),
@@ -153,6 +154,34 @@ function storagePanelLive() {
   return { embeds: [embed], components: [row] };
 }
 
+function startImageCollector(client, userId, channelId, onImage, onTimeout) {
+  const channel = client.channels.cache.get(channelId);
+  if (!channel) {
+    onTimeout();
+    return;
+  }
+  const filter = (m) =>
+    m.author.id === userId &&
+    m.attachments.size > 0 &&
+    [...m.attachments.values()].some((a) =>
+      (a.contentType || '').startsWith('image/') ||
+      /\.(png|jpe?g|gif|webp)$/i.test(a.name || a.url),
+    );
+
+  const collector = channel.createMessageCollector({ filter, max: 1, time: 60_000 });
+  collector.on('collect', async (m) => {
+    const att = [...m.attachments.values()].find(
+      (a) =>
+        (a.contentType || '').startsWith('image/') ||
+        /\.(png|jpe?g|gif|webp)$/i.test(a.name || a.url),
+    );
+    if (att) await onImage(att.url, m);
+  });
+  collector.on('end', async (collected) => {
+    if (collected.size === 0) await onTimeout();
+  });
+}
+
 async function handleLogistics(interaction) {
   const id = interaction.customId || '';
 
@@ -170,9 +199,10 @@ async function handleLogistics(interaction) {
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
               .setCustomId('item_name')
-              .setLabel('ชื่อของ')
+              .setLabel('ชนิดของ / ชื่อของ')
               .setStyle(TextInputStyle.Short)
-              .setRequired(true),
+              .setRequired(true)
+              .setPlaceholder('เช่น อาวุธ, ยา, กล่อง'),
           ),
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
@@ -189,13 +219,6 @@ async function handleLogistics(interaction) {
               .setStyle(TextInputStyle.Short)
               .setRequired(true),
           ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId('proof_url')
-              .setLabel('ลิงก์รูปหลักฐาน')
-              .setStyle(TextInputStyle.Short)
-              .setRequired(true),
-          ),
         );
         return interaction.showModal(modal);
       }
@@ -208,7 +231,7 @@ async function handleLogistics(interaction) {
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
               .setCustomId('item_name')
-              .setLabel('ชื่อของ')
+              .setLabel('ชนิดของ / ชื่อของ')
               .setStyle(TextInputStyle.Short)
               .setRequired(true),
           ),
@@ -219,13 +242,6 @@ async function handleLogistics(interaction) {
               .setStyle(TextInputStyle.Short)
               .setRequired(true)
               .setValue('1'),
-          ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId('proof_url')
-              .setLabel('ลิงก์รูปหลักฐาน')
-              .setStyle(TextInputStyle.Short)
-              .setRequired(true),
           ),
         );
         return interaction.showModal(modal);
@@ -249,7 +265,7 @@ async function handleLogistics(interaction) {
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
               .setCustomId('item_name')
-              .setLabel('ชื่อของ')
+              .setLabel('ชนิดของ / ชื่อของ')
               .setStyle(TextInputStyle.Short)
               .setRequired(true),
           ),
@@ -272,77 +288,84 @@ async function handleLogistics(interaction) {
       }
 
       if (id.startsWith('delivery_check_')) {
-        const recent = formatRecentDeliveries(8);
         return interaction.reply({
-          content: `📦 **ประวัติส่งของล่าสุด** (จากระบบ / ห้อง log)\n\n${recent}`,
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      if (id.startsWith('delivery_manage_')) {
-        if (!isAdmin(interaction.member)) {
-          return interaction.reply({ content: '❌ เฉพาะแอดมิน', flags: MessageFlags.Ephemeral });
-        }
-        return interaction.reply({
-          content: 'ดูรายการทั้งหมดได้ที่ห้อง **ประวัติ-log** — ระบบดึงจากบันทึกส่งของ',
+          content: `📦 **ประวัติส่งของล่าสุด**\n\n${formatRecentDeliveries(8)}`,
           flags: MessageFlags.Ephemeral,
         });
       }
 
       return interaction.reply({
-        content: 'ปุ่มนี้ยังไม่รองรับ — ให้แอดมินรัน `/setup` ส่งแผงใหม่',
+        content: 'ปุ่มนี้ยังไม่รองรับ — รัน `/setup` ส่งแผงใหม่',
         flags: MessageFlags.Ephemeral,
       });
     }
 
-    // --- Modal: ส่งของ → บันทึก + โพสต์ห้อง log ---
+    // Modal ส่งของ → รอรูป snap
     if (interaction.isModalSubmit() && id === 'delivery_submit_modal') {
       const item = interaction.fields.getTextInputValue('item_name').trim();
       const qty = parseInt(interaction.fields.getTextInputValue('quantity'), 10) || 1;
       const dest = interaction.fields.getTextInputValue('destination').trim();
-      const proof = interaction.fields.getTextInputValue('proof_url').trim();
-      const logId = createDelivery(interaction.user.id, item, qty, dest, proof);
+      const userId = interaction.user.id;
+      const channelId = interaction.channelId;
 
-      const embed = new EmbedBuilder()
-        .setColor(0x22c55e)
-        .setTitle('📦 บันทึกส่งของแล้ว')
-        .setDescription('รายการนี้ถูกบันทึกและส่งเข้า **ประวัติ-log** แล้ว')
-        .addFields(
-          { name: 'ของ', value: item, inline: true },
-          { name: 'จำนวน', value: String(qty), inline: true },
-          { name: 'จุดส่ง', value: dest, inline: true },
-          { name: 'โดย', value: `<@${interaction.user.id}>`, inline: true },
-          { name: 'หลักฐาน', value: proof },
-        )
-        .setFooter({ text: `Delivery #${logId} · จากห้องส่งของ` })
-        .setTimestamp();
+      pendingDeliveryProof.set(userId, { item, qty, dest, channelId, at: Date.now() });
 
-      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      await interaction.reply({
+        content:
+          `📦 กรอกข้อมูลแล้ว: **${item}** × **${qty}** → ${dest}\n\n` +
+          `ต่อไป **อัปโหลดรูป snap / แคปหน้าจอ** ในห้องนี้ภายใน **60 วินาที**\n` +
+          `แนบรูปอย่างเดียวก็ได้ (ไม่ต้องพิมพ์ข้อความ)`,
+        flags: MessageFlags.Ephemeral,
+      });
 
-      const posted = await postToLog(interaction.client, { embeds: [embed] });
-      if (!posted) {
-        await interaction
-          .followUp({
-            content:
-              '⚠️ บันทึกแล้ว แต่ยังส่งเข้าห้องประวัติ-log ไม่ได้ — รัน `/setup` เพื่อผูกห้อง',
-            flags: MessageFlags.Ephemeral,
-          })
-          .catch(() => {});
-      }
+      startImageCollector(
+        interaction.client,
+        userId,
+        channelId,
+        async (imageUrl, msg) => {
+          pendingDeliveryProof.delete(userId);
+          const logId = createDelivery(userId, item, qty, dest, imageUrl);
+          const embed = new EmbedBuilder()
+            .setColor(0x22c55e)
+            .setTitle('📦 บันทึกส่งของแล้ว')
+            .setDescription('บันทึกจากห้องส่งของ · หลักฐานจากรูป snap')
+            .addFields(
+              { name: 'ชนิดของ', value: item, inline: true },
+              { name: 'จำนวน', value: String(qty), inline: true },
+              { name: 'จุดส่ง', value: dest, inline: true },
+              { name: 'โดย', value: `<@${userId}>`, inline: true },
+            )
+            .setImage(imageUrl)
+            .setFooter({ text: `Delivery #${logId}` })
+            .setTimestamp();
 
-      // อัปเดตแผงส่งของให้โชว์รายการล่าสุด
-      try {
-        if (interaction.message?.editable) {
-          await interaction.message.edit(deliveryPanel());
-        }
-      } catch { /* ignore */ }
+          await postToLog(interaction.client, { embeds: [embed] });
+          await msg.reply({ embeds: [embed] }).catch(() => {});
+          try {
+            if (interaction.message?.editable) await interaction.message.edit(deliveryPanel());
+          } catch { /* ignore */ }
+        },
+        async () => {
+          if (pendingDeliveryProof.has(userId)) {
+            pendingDeliveryProof.delete(userId);
+            const ch = await interaction.client.channels.fetch(channelId).catch(() => null);
+            if (ch) {
+              await ch
+                .send({
+                  content: `<@${userId}> หมดเวลา 60 วินาที — ไม่ได้รับรูปหลักฐาน ส่งของไม่ถูกบันทึก กดปุ่มใหม่แล้วอัปโหลดรูปอีกครั้ง`,
+                })
+                .catch(() => {});
+            }
+          }
+        },
+      );
       return;
     }
 
+    // Modal เบิกของ → รอรูป snap
     if (interaction.isModalSubmit() && id === 'storage_withdraw_modal') {
       const item = interaction.fields.getTextInputValue('item_name').trim();
       const qty = Math.abs(parseInt(interaction.fields.getTextInputValue('quantity'), 10) || 1);
-      const proof = interaction.fields.getTextInputValue('proof_url').trim();
       const items = listStorageItems();
       const found = items.find((i) => i.name.toLowerCase() === item.toLowerCase());
       if (!found || found.quantity < qty) {
@@ -351,24 +374,58 @@ async function handleLogistics(interaction) {
           flags: MessageFlags.Ephemeral,
         });
       }
-      upsertStorageItem(found.name, -qty);
-      logStorageAction(found.name, 'withdraw', qty, interaction.user.id, proof);
 
-      const embed = new EmbedBuilder()
-        .setColor(0xf59e0b)
-        .setTitle('📥 เบิกของแล้ว')
-        .setDescription(`**${found.name}** × ${qty}\nเหลือในคลัง: **${found.quantity - qty}**`)
-        .addFields(
-          { name: 'โดย', value: `<@${interaction.user.id}>`, inline: true },
-          { name: 'หลักฐาน', value: proof },
-        )
-        .setTimestamp();
+      const userId = interaction.user.id;
+      const channelId = interaction.channelId;
+      pendingWithdrawProof.set(userId, {
+        item: found.name,
+        qty,
+        channelId,
+        stock: found.quantity,
+      });
 
-      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-      await postToLog(interaction.client, { embeds: [embed] });
-      try {
-        if (interaction.message?.editable) await interaction.message.edit(storagePanelLive());
-      } catch { /* ignore */ }
+      await interaction.reply({
+        content:
+          `📥 เบิก **${found.name}** × **${qty}**\n\n` +
+          `อัปโหลด**รูป snap หลักฐาน**ในห้องนี้ภายใน **60 วินาที**`,
+        flags: MessageFlags.Ephemeral,
+      });
+
+      startImageCollector(
+        interaction.client,
+        userId,
+        channelId,
+        async (imageUrl, msg) => {
+          pendingWithdrawProof.delete(userId);
+          upsertStorageItem(found.name, -qty);
+          logStorageAction(found.name, 'withdraw', qty, userId, imageUrl);
+          const embed = new EmbedBuilder()
+            .setColor(0xf59e0b)
+            .setTitle('📥 เบิกของแล้ว')
+            .setDescription(
+              `**${found.name}** × ${qty}\nเหลือในคลัง: **${found.quantity - qty}**`,
+            )
+            .addFields({ name: 'โดย', value: `<@${userId}>`, inline: true })
+            .setImage(imageUrl)
+            .setTimestamp();
+          await postToLog(interaction.client, { embeds: [embed] });
+          await msg.reply({ embeds: [embed] }).catch(() => {});
+          try {
+            if (interaction.message?.editable) await interaction.message.edit(storagePanelLive());
+          } catch { /* ignore */ }
+        },
+        async () => {
+          if (pendingWithdrawProof.has(userId)) {
+            pendingWithdrawProof.delete(userId);
+            const ch = await interaction.client.channels.fetch(channelId).catch(() => null);
+            if (ch) {
+              await ch
+                .send(`<@${userId}> หมดเวลา — ไม่ได้รับรูปหลักฐาน การเบิกถูกยกเลิก`)
+                .catch(() => {});
+            }
+          }
+        },
+      );
       return;
     }
 
