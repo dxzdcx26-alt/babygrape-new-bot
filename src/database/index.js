@@ -1,5 +1,6 @@
 const db = require('./db');
 const migration001 = require('./migrations/001_initial');
+const migration002 = require('./migrations/002_storage');
 
 function getCurrentVersion() {
   try {
@@ -12,7 +13,7 @@ function getCurrentVersion() {
 
 function runMigrations() {
   const current = getCurrentVersion();
-  const migrations = [migration001];
+  const migrations = [migration001, migration002];
   for (const m of migrations) {
     if (m.version > current) {
       console.log(`📦 Running migration ${m.name} (v${m.version})...`);
@@ -76,77 +77,80 @@ function addWeeklyScore(userId, amount, adminId = null, reason = null, reportId 
     db.prepare(
       `INSERT INTO score_history (user_id, action, amount, weekly_before, weekly_after, monthly_before, monthly_after, admin_id, reason, report_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(userId, reportId ? 'heist' : 'add', amount, before.weekly_score, weeklyAfter, before.monthly_score, before.monthly_score, adminId, reason, reportId);
+    ).run(
+      userId,
+      reportId ? 'heist' : 'add',
+      amount,
+      before.weekly_score || 0,
+      weeklyAfter,
+      before.monthly_score || 0,
+      before.monthly_score || 0,
+      adminId,
+      reason,
+      reportId,
+    );
   });
-  return { weekly_before: before.weekly_score, weekly_after: weeklyAfter };
+  return getUserScore(userId);
 }
 
 function setWeeklyScore(userId, amount, adminId = null, reason = null) {
   ensureUser(userId);
   const before = getUserScore(userId);
-  const delta = amount - (before.weekly_score || 0);
-  const totalAfter = (before.total_score || 0) + delta;
   withTransaction(() => {
-    db.prepare(`UPDATE users SET weekly_score = ?, total_score = ?, updated_at = datetime('now') WHERE id = ?`).run(amount, totalAfter, userId);
+    db.prepare(`UPDATE users SET weekly_score = ?, updated_at = datetime('now') WHERE id = ?`).run(amount, userId);
     db.prepare(
       `INSERT INTO score_history (user_id, action, amount, weekly_before, weekly_after, monthly_before, monthly_after, admin_id, reason)
        VALUES (?, 'set', ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(userId, amount, before.weekly_score, amount, before.monthly_score, before.monthly_score, adminId, reason);
+    ).run(userId, amount, before.weekly_score || 0, amount, before.monthly_score || 0, before.monthly_score || 0, adminId, reason);
   });
+  return getUserScore(userId);
 }
 
 function removeWeeklyScore(userId, amount, adminId = null, reason = null) {
-  return addWeeklyScore(userId, -amount, adminId, reason);
+  return addWeeklyScore(userId, -Math.abs(amount), adminId, reason);
 }
 
-function weeklyReset() {
-  const users = db.prepare('SELECT id, weekly_score, monthly_score FROM users WHERE weekly_score != 0').all();
-  const results = [];
+function weeklyReset(adminId = null) {
+  const rows = db.prepare('SELECT id, weekly_score, monthly_score FROM users').all();
   withTransaction(() => {
-    for (const u of users) {
-      const newMonthly = (u.monthly_score || 0) + (u.weekly_score || 0);
-      db.prepare(`UPDATE users SET monthly_score = ?, weekly_score = 0, updated_at = datetime('now') WHERE id = ?`).run(newMonthly, u.id);
+    for (const r of rows) {
+      const weekly = r.weekly_score || 0;
+      if (weekly === 0) continue;
+      const monthly = (r.monthly_score || 0) + weekly;
+      db.prepare(`UPDATE users SET monthly_score = ?, weekly_score = 0, updated_at = datetime('now') WHERE id = ?`).run(monthly, r.id);
       db.prepare(
-        `INSERT INTO score_history (user_id, action, amount, weekly_before, weekly_after, monthly_before, monthly_after, reason)
-         VALUES (?, 'weekly_reset', ?, ?, 0, ?, ?, 'Weekly reset')`,
-      ).run(u.id, u.weekly_score, u.weekly_score, u.monthly_score, newMonthly);
-      results.push({ id: u.id, weekly: u.weekly_score, monthly_after: newMonthly });
+        `INSERT INTO score_history (user_id, action, amount, weekly_before, weekly_after, monthly_before, monthly_after, admin_id, reason)
+         VALUES (?, 'weekly_reset', ?, ?, 0, ?, ?, ?, 'weekly reset')`,
+      ).run(r.id, weekly, weekly, r.monthly_score || 0, monthly, adminId);
     }
   });
-  return results;
+  return rows.length;
 }
 
-function createHeistReport({ reporterId, activity, timeType, scorePerMember, imageUrlFront, imageUrlBack, notes, memberIds }) {
-  ensureUser(reporterId);
-  return withTransaction(() => {
-    const info = db.prepare(
-      `INSERT INTO heist_reports (reporter_id, activity, time_type, score_per_member, image_url_front, image_url_back, notes, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')`,
-    ).run(reporterId, activity, timeType, scorePerMember, imageUrlFront, imageUrlBack || null, notes || null);
-    const reportId = Number(info.lastInsertRowid);
-    for (const mid of memberIds) {
-      ensureUser(mid);
-      db.prepare(`INSERT INTO heist_members (report_id, user_id, score_awarded) VALUES (?, ?, ?)`).run(reportId, mid, scorePerMember);
-      const before = db.prepare('SELECT weekly_score, monthly_score, total_score FROM users WHERE id = ?').get(mid);
-      const weeklyAfter = (before.weekly_score || 0) + scorePerMember;
-      const totalAfter = (before.total_score || 0) + scorePerMember;
-      db.prepare(`UPDATE users SET weekly_score = ?, total_score = ?, updated_at = datetime('now') WHERE id = ?`).run(weeklyAfter, totalAfter, mid);
-      db.prepare(
-        `INSERT INTO score_history (user_id, action, amount, weekly_before, weekly_after, monthly_before, monthly_after, reason, report_id)
-         VALUES (?, 'heist', ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(mid, scorePerMember, before.weekly_score, weeklyAfter, before.monthly_score, before.monthly_score, `Heist: ${activity}`, reportId);
-    }
-    return reportId;
-  });
+function createHeistReport(data) {
+  const info = db.prepare(
+    `INSERT INTO heist_reports (reporter_id, activity, time_slot, member_ids, image_url, score_each, guild_id, channel_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    data.reporter_id,
+    data.activity,
+    data.time_slot,
+    JSON.stringify(data.member_ids || []),
+    data.image_url || null,
+    data.score_each || 0,
+    data.guild_id || null,
+    data.channel_id || null,
+  );
+  return Number(info.lastInsertRowid);
 }
 
-function logAudit(actorId, action, targetType = null, targetId = null, details = null) {
-  db.prepare(`INSERT INTO audit_logs (actor_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)`).run(actorId, action, targetType, targetId, details ? JSON.stringify(details) : null);
+function logAudit(action, actorId, detail = null) {
+  db.prepare(`INSERT INTO audit_log (action, actor_id, detail) VALUES (?, ?, ?)`).run(action, actorId, detail);
 }
 
-function getSetting(key, defaultValue = null) {
+function getSetting(key) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
-  return row ? row.value : defaultValue;
+  return row ? row.value : null;
 }
 
 function setSetting(key, value) {
@@ -171,7 +175,8 @@ function getLeaderboardMessage(type) {
 function openCheckinSession(name, openedBy) {
   ensureUser(openedBy);
   const info = db.prepare(`INSERT INTO checkin_sessions (name, opened_by, status) VALUES (?, ?, 'open')`).run(name, openedBy);
-  return Number(info.lastInsertRowid);
+  const id = Number(info.lastInsertRowid);
+  return { id, name, opened_by: openedBy, status: 'open' };
 }
 
 function closeCheckinSession(sessionId) {
@@ -188,7 +193,7 @@ function doCheckin(sessionId, userId) {
     db.prepare(`INSERT INTO checkins (session_id, user_id) VALUES (?, ?)`).run(sessionId, userId);
     return { success: true };
   } catch (e) {
-    if (String(e.message).includes('UNIQUE') || e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (String(e.message || e).includes('UNIQUE')) {
       return { success: false, reason: 'already_checked_in' };
     }
     throw e;
@@ -196,21 +201,29 @@ function doCheckin(sessionId, userId) {
 }
 
 function getCheckinList(sessionId) {
-  return db.prepare(
-    `SELECT c.user_id, c.checked_at, u.display_name, u.tag
+  return db
+    .prepare(
+      `SELECT c.user_id, c.checked_at, u.display_name, u.tag
      FROM checkins c LEFT JOIN users u ON u.id = c.user_id
      WHERE c.session_id = ? ORDER BY c.checked_at`,
-  ).all(sessionId);
+    )
+    .all(sessionId);
 }
 
 function createLeave(userId, startDate, endDate, reason) {
   ensureUser(userId);
-  const info = db.prepare(`INSERT INTO leaves (user_id, start_date, end_date, reason, status) VALUES (?, ?, ?, ?, 'pending')`).run(userId, startDate, endDate, reason);
+  const info = db
+    .prepare(
+      `INSERT INTO leaves (user_id, start_date, end_date, reason, status) VALUES (?, ?, ?, ?, 'pending')`,
+    )
+    .run(userId, startDate, endDate, reason);
   return Number(info.lastInsertRowid);
 }
 
 function reviewLeave(leaveId, status, reviewerId, note = null) {
-  db.prepare(`UPDATE leaves SET status = ?, reviewed_by = ?, review_note = ?, reviewed_at = datetime('now') WHERE id = ?`).run(status, reviewerId, note, leaveId);
+  db.prepare(
+    `UPDATE leaves SET status = ?, reviewed_by = ?, review_note = ?, reviewed_at = datetime('now') WHERE id = ?`,
+  ).run(status, reviewerId, note, leaveId);
 }
 
 function getPendingLeaves() {
@@ -221,11 +234,95 @@ function getUserLeaves(userId) {
   return db.prepare(`SELECT * FROM leaves WHERE user_id = ? ORDER BY created_at DESC`).all(userId);
 }
 
+function listStorageItems() {
+  try {
+    return db.prepare('SELECT * FROM storage_items ORDER BY name').all();
+  } catch {
+    return [];
+  }
+}
+
+function upsertStorageItem(name, quantityDelta, note = null) {
+  const existing = db.prepare('SELECT * FROM storage_items WHERE name = ?').get(name);
+  if (!existing) {
+    const qty = Math.max(0, quantityDelta);
+    db.prepare(`INSERT INTO storage_items (name, quantity, note) VALUES (?, ?, ?)`).run(name, qty, note);
+    return { name, quantity: qty };
+  }
+  const qty = Math.max(0, (existing.quantity || 0) + quantityDelta);
+  db.prepare(
+    `UPDATE storage_items SET quantity = ?, note = COALESCE(?, note), updated_at = datetime('now') WHERE id = ?`,
+  ).run(qty, note, existing.id);
+  return { name, quantity: qty, id: existing.id };
+}
+
+function setStorageQuantity(name, quantity, note = null) {
+  const existing = db.prepare('SELECT * FROM storage_items WHERE name = ?').get(name);
+  const qty = Math.max(0, quantity);
+  if (!existing) {
+    db.prepare(`INSERT INTO storage_items (name, quantity, note) VALUES (?, ?, ?)`).run(name, qty, note);
+  } else {
+    db.prepare(
+      `UPDATE storage_items SET quantity = ?, note = COALESCE(?, note), updated_at = datetime('now') WHERE id = ?`,
+    ).run(qty, note, existing.id);
+  }
+  return { name, quantity: qty };
+}
+
+function logStorageAction(itemName, action, quantity, userId, proofUrl = null, note = null) {
+  ensureUser(userId);
+  db.prepare(
+    `INSERT INTO storage_logs (item_name, action, quantity, user_id, proof_url, note) VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(itemName, action, quantity, userId, proofUrl, note);
+}
+
+function createDelivery(userId, itemName, quantity, destination, proofUrl, note = null) {
+  ensureUser(userId);
+  const info = db
+    .prepare(
+      `INSERT INTO delivery_logs (user_id, item_name, quantity, destination, proof_url, note) VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(userId, itemName, quantity, destination, proofUrl, note);
+  return Number(info.lastInsertRowid);
+}
+
+function getRecentDeliveries(limit = 10) {
+  try {
+    return db.prepare(`SELECT * FROM delivery_logs ORDER BY created_at DESC LIMIT ?`).all(limit);
+  } catch {
+    return [];
+  }
+}
+
 module.exports = {
-  db, runMigrations, ensureUser, getScores, getUserScore,
-  addWeeklyScore, setWeeklyScore, removeWeeklyScore, weeklyReset,
-  createHeistReport, logAudit, getSetting, setSetting,
-  saveLeaderboardMessage, getLeaderboardMessage,
-  openCheckinSession, closeCheckinSession, getOpenCheckinSession,
-  doCheckin, getCheckinList, createLeave, reviewLeave, getPendingLeaves, getUserLeaves,
+  db,
+  runMigrations,
+  ensureUser,
+  getScores,
+  getUserScore,
+  addWeeklyScore,
+  setWeeklyScore,
+  removeWeeklyScore,
+  weeklyReset,
+  createHeistReport,
+  logAudit,
+  getSetting,
+  setSetting,
+  saveLeaderboardMessage,
+  getLeaderboardMessage,
+  openCheckinSession,
+  closeCheckinSession,
+  getOpenCheckinSession,
+  doCheckin,
+  getCheckinList,
+  createLeave,
+  reviewLeave,
+  getPendingLeaves,
+  getUserLeaves,
+  listStorageItems,
+  upsertStorageItem,
+  setStorageQuantity,
+  logStorageAction,
+  createDelivery,
+  getRecentDeliveries,
 };
