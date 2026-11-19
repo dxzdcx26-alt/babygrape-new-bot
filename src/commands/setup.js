@@ -193,7 +193,7 @@ module.exports = {
       const control = await findOrCreateText(CHANNELS.control, systemCat);
       const leaveCh = await findOrCreateText(CHANNELS.leave, systemCat);
       const checkinCh = await findOrCreateText(CHANNELS.checkin, systemCat);
-      await findOrCreateText(CHANNELS.delivery, systemCat);
+      const deliveryCh = await findOrCreateText(CHANNELS.delivery, systemCat);
       const storageCh = await findOrCreateText(CHANNELS.storage, systemCat);
       const score = await findOrCreateText(CHANNELS.score, systemCat);
       await findOrCreateText(CHANNELS.leaveSummary, systemCat);
@@ -214,6 +214,8 @@ module.exports = {
         CHECKIN_CHANNEL_ID: checkinCh.id,
         ADMIN_CHANNEL_ID: adminCh.id,
         ROSTER_CHANNEL_ID: rosterCh.id,
+        DELIVERY_CHANNEL_ID: deliveryCh.id,
+        STORAGE_CHANNEL_ID: storageCh.id,
       };
 
       for (const [key, value] of Object.entries(mapping)) {
@@ -226,6 +228,7 @@ module.exports = {
         leave: leaveCh,
         checkin: checkinCh,
         storage: storageCh,
+        delivery: deliveryCh,
         score,
         log,
         admin: adminCh,
@@ -255,6 +258,7 @@ module.exports = {
             '',
             '₊˚ แผงจัดการอยู่ที่ **🎛️ ‧ heist˗score** ‧₊˚',
             '₊˚ รายชื่อสมาชิกอยู่ที่ **👥 ‧ รายชื่อ** ‧₊˚',
+            '₊˚ ส่งของ / คลัง พร้อมใช้งาน ‧₊˚',
           ].filter(Boolean).join('\n'),
         )
         .addFields(
