@@ -66,16 +66,6 @@ const CHANNELS = {
     aliases: ['ประวัติ-log', 'ประวัติ', '📜'],
     topic: '₊˚ Log รายงานกิจกรรม ‧₊˚',
   },
-  admin: {
-    name: '🎛️ ‧ heist˗score',
-    aliases: ['heist-score', 'heist˗score', '🎛️'],
-    topic: '₊˚ แผงจัดการระบบ Baby Grape ‧₊˚',
-  },
-  chat: {
-    name: '💬 ‧ heist˗chat',
-    aliases: ['heist-chat', 'กิจกรรม-แชท', 'แชทกิจกรรม', '💬'],
-    topic: '₊˚ แชทกิจกรรม — รีเซ็ตเข้ากรุทุก 3 วัน ‧₊˚',
-  },
 };
 
 const CATEGORY_SYSTEM = '🍇 ‧ BABY GRAPE SYSTEM';
@@ -357,12 +347,14 @@ module.exports = {
       await findOrCreateText(CHANNELS.checkinSummary, systemCat);
       const rosterCh = await findOrCreateText(CHANNELS.roster, systemCat);
       const log = await findOrCreateText(CHANNELS.log, systemCat);
-      const adminCh = await findOrCreateText(CHANNELS.admin, systemCat);
-      const target = await findOrCreateText(CHANNELS.chat, systemCat);
+      // ไม่สร้าง heist-score / heist-chat
+      const adminCh = null;
+      const target = null;
 
-      if (adminCh && adminRole) {
+      // จำกัดห้อง log: แอดมิน/helper + บอท
+      if (log && adminRole) {
         try {
-          await adminCh.permissionOverwrites.set([
+          await log.permissionOverwrites.set([
             { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
             {
               id: adminRole.id,
@@ -378,7 +370,6 @@ module.exports = {
                     id: helperRole.id,
                     allow: [
                       PermissionFlagsBits.ViewChannel,
-                      PermissionFlagsBits.SendMessages,
                       PermissionFlagsBits.ReadMessageHistory,
                     ],
                   },
@@ -391,49 +382,8 @@ module.exports = {
                     allow: [
                       PermissionFlagsBits.ViewChannel,
                       PermissionFlagsBits.SendMessages,
+                      PermissionFlagsBits.EmbedLinks,
                       PermissionFlagsBits.ManageMessages,
-                      PermissionFlagsBits.EmbedLinks,
-                    ],
-                  },
-                ]
-              : []),
-          ]);
-          created.push('สิทธิ์ห้อง heist-score (Admin only)');
-        } catch (e) {
-          console.warn('admin channel overwrite failed', e.message);
-        }
-      }
-
-      if (log && adminRole) {
-        try {
-          await log.permissionOverwrites.set([
-            { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-            {
-              id: adminRole.id,
-              allow: [
-                PermissionFlagsBits.ViewChannel,
-                PermissionFlagsBits.ReadMessageHistory,
-              ],
-            },
-            ...(helperRole
-              ? [
-                  {
-                    id: helperRole.id,
-                    allow: [
-                      PermissionFlagsBits.ViewChannel,
-                      PermissionFlagsBits.ReadMessageHistory,
-                    ],
-                  },
-                ]
-              : []),
-            ...(me
-              ? [
-                  {
-                    id: me.id,
-                    allow: [
-                      PermissionFlagsBits.ViewChannel,
-                      PermissionFlagsBits.SendMessages,
-                      PermissionFlagsBits.EmbedLinks,
                     ],
                   },
                 ]
@@ -449,11 +399,9 @@ module.exports = {
         CONTROL_CHANNEL_ID: control.id,
         LOG_CHANNEL_ID: log.id,
         SCORE_CHANNEL_ID: score.id,
-        TARGET_CHANNEL_ID: target.id,
         ARCHIVE_CATEGORY_ID: archiveCat.id,
         LEAVE_CHANNEL_ID: leaveCh.id,
         CHECKIN_CHANNEL_ID: checkinCh.id,
-        ADMIN_CHANNEL_ID: adminCh.id,
         ROSTER_CHANNEL_ID: rosterCh.id,
         DELIVERY_CHANNEL_ID: deliveryCh.id,
         STORAGE_CHANNEL_ID: storageCh.id,
@@ -468,6 +416,7 @@ module.exports = {
       }
       if (mapping.ADMIN_ROLE_ID) config.roles.admin = mapping.ADMIN_ROLE_ID;
 
+      // แผงทั้งหมดจาก /setup — แผงแอดมินไปห้อง log
       const panelResults = await sendAllPanels(guild, {
         control,
         leave: leaveCh,
@@ -476,7 +425,7 @@ module.exports = {
         delivery: deliveryCh,
         score,
         log,
-        admin: adminCh,
+        admin: log,
       });
 
       try {
@@ -497,7 +446,7 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setColor(0x8b5cf6)
-        .setTitle('✨ Setup เสร็จ — ห้อง + ยศ + สิทธิ์พร้อมแล้ว')
+        .setTitle('✨ Setup เสร็จ — ห้อง + ยศ + แผงพร้อมแล้ว')
         .setDescription(
           [
             created.length ? `**สร้าง/ตั้งค่า**\n${created.map((x) => `✦ ${x}`).join('\n')}` : null,
@@ -507,10 +456,9 @@ module.exports = {
               : null,
             '',
             roleLine ? `₊˚ ยศ: ${roleLine}` : null,
-            '₊˚ **BG Admin** = Administrator',
-            '₊˚ **BG Helper** = จัดการข้อความ / ตี / mute',
-            '₊˚ **BG Member** = คุย + ใช้ปุ่มระบบ',
-            '₊˚ ห้อง heist-score / log เห็นเฉพาะ Admin·Helper',
+            '₊˚ **ไม่สร้าง** ห้อง heist-score / heist-chat',
+            '₊˚ แผงแอดมินอยู่ที่ห้อง **ประวัติ-log**',
+            '₊˚ แผงทุกปุ่มถูกส่งจาก `/setup` แล้ว',
           ]
             .filter(Boolean)
             .join('\n'),
