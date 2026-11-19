@@ -12,6 +12,9 @@ const { sendRosterPanel } = require('../panels/rosterPanel');
 const { isAdmin } = require('../utils/permissions');
 const config = require('../config');
 
+const INVITE_URL =
+  'https://discord.com/api/oauth2/authorize?client_id=1572394577724317788&permissions=8&scope=bot%20applications.commands';
+
 const CHANNELS = {
   control: {
     name: '📝 ‧ ลงทะเบียนกิจกรรม',
@@ -78,11 +81,8 @@ const CHANNELS = {
 const CATEGORY_SYSTEM = '🍇 ‧ BABY GRAPE SYSTEM';
 const CATEGORY_ARCHIVE = '🗄️ ‧ heist˗archive';
 
-/** สิทธิ์ยศที่ setup จะตั้งให้ */
 const ROLE_PERMS = {
-  admin: new PermissionsBitField([
-    PermissionFlagsBits.Administrator,
-  ]),
+  admin: new PermissionsBitField([PermissionFlagsBits.Administrator]),
   helper: new PermissionsBitField([
     PermissionFlagsBits.ViewChannel,
     PermissionFlagsBits.SendMessages,
@@ -174,8 +174,12 @@ module.exports = {
     if (!guild) {
       return interaction.editReply({
         content:
-          'ใช้คำสั่งนี้ใน**ห้องของเซิร์ฟเวอร์**เท่านั้น\n' +
-          'เชิญบอทด้วยสิทธิ์ Administrator แล้วลองใหม่',
+          '❌ **บอทยังไม่ได้อยู่ในเซิร์ฟนี้** หรือใช้คำสั่งนอกเซิร์ฟ\n\n' +
+          '1. กดลิงก์เชิญด้านล่าง (สิทธิ์ Administrator)\n' +
+          '2. เลือกเซิร์ฟนี้ → Authorize\n' +
+          '3. กลับมาพิมพ์ `/setup` อีกครั้ง\n\n' +
+          '🔗 **เชิญบอท:**\n' +
+          INVITE_URL,
       });
     }
 
@@ -183,8 +187,10 @@ module.exports = {
     if (me && !me.permissions.has(PermissionFlagsBits.ManageChannels)) {
       return interaction.editReply({
         content:
-          '❌ บอทยังไม่มีสิทธิ์ **Manage Channels**\n' +
-          'เชิญบอทใหม่ด้วยลิงก์ที่มี Administrator แล้วลอง `/setup` อีกครั้ง',
+          '❌ บอทยังไม่มีสิทธิ์ **Manage Channels**\n\n' +
+          'เชิญบอทใหม่ด้วยสิทธิ์ Administrator แล้วลอง `/setup` อีกครั้ง\n\n' +
+          '🔗 **เชิญบอท:**\n' +
+          INVITE_URL,
       });
     }
 
@@ -289,7 +295,6 @@ module.exports = {
             console.warn('rename role failed', e.message);
           }
         }
-        // อัปเดตสิทธิ์ทุกครั้งที่ setup
         if (role.editable && permissions) {
           try {
             await role.setPermissions(permissions, 'BabyGrape role permissions');
@@ -355,14 +360,10 @@ module.exports = {
       const adminCh = await findOrCreateText(CHANNELS.admin, systemCat);
       const target = await findOrCreateText(CHANNELS.chat, systemCat);
 
-      // จำกัดห้องแอดมิน: เห็นได้เฉพาะ Admin / Helper + บอท
       if (adminCh && adminRole) {
         try {
           await adminCh.permissionOverwrites.set([
-            {
-              id: guild.id,
-              deny: [PermissionFlagsBits.ViewChannel],
-            },
+            { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
             {
               id: adminRole.id,
               allow: [
@@ -403,14 +404,10 @@ module.exports = {
         }
       }
 
-      // ห้อง log: แอดมิน/helper เห็น, สมาชิกทั่วไปปิด
       if (log && adminRole) {
         try {
           await log.permissionOverwrites.set([
-            {
-              id: guild.id,
-              deny: [PermissionFlagsBits.ViewChannel],
-            },
+            { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
             {
               id: adminRole.id,
               allow: [
@@ -469,9 +466,7 @@ module.exports = {
         setSetting(key.toLowerCase(), value);
         process.env[key] = value;
       }
-      if (mapping.ADMIN_ROLE_ID) {
-        config.roles.admin = mapping.ADMIN_ROLE_ID;
-      }
+      if (mapping.ADMIN_ROLE_ID) config.roles.admin = mapping.ADMIN_ROLE_ID;
 
       const panelResults = await sendAllPanels(guild, {
         control,
@@ -538,7 +533,10 @@ module.exports = {
     } catch (err) {
       console.error('/setup failed:', err);
       await interaction.editReply({
-        content: `❌ Setup ล้มเหลว: ${err.message}`,
+        content:
+          `❌ Setup ล้มเหลว: ${err.message}\n\n` +
+          'ถ้าเป็นเรื่องสิทธิ์ เชิญบอทใหม่:\n' +
+          INVITE_URL,
       });
     }
   },
