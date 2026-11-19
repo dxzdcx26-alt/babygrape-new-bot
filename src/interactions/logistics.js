@@ -3,6 +3,8 @@ const {
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   EmbedBuilder,
   MessageFlags,
 } = require('discord.js');
@@ -17,21 +19,29 @@ const { isAdmin } = require('../utils/permissions');
 const config = require('../config');
 
 function isLogisticsInteraction(interaction) {
-  const id = interaction.customId || '';
+  const id = (interaction.customId || '').toLowerCase();
+  if (!id) return false;
   return (
     id === 'storage_withdraw_btn' ||
     id === 'storage_admin_btn' ||
     id === 'delivery_submit_btn' ||
     id === 'storage_withdraw_modal' ||
     id === 'storage_admin_modal' ||
-    id === 'delivery_submit_modal'
+    id === 'delivery_submit_modal' ||
+    id.includes('storage') ||
+    id.includes('delivery') ||
+    id.includes('withdraw')
   );
 }
 
 function formatStock() {
-  const items = listStorageItems();
-  if (!items.length) return '✕ คลังว่างเปล่า (Empty)';
-  return items.map((i) => `• **${i.name}** × ${i.quantity}`).join('\n');
+  try {
+    const items = listStorageItems();
+    if (!items.length) return '✕ คลังว่างเปล่า (Empty)';
+    return items.map((i) => `• **${i.name}** × ${i.quantity}`).join('\n');
+  } catch {
+    return '✕ ยังโหลดคลังไม่ได้';
+  }
 }
 
 function deliveryPanel() {
@@ -51,28 +61,16 @@ function deliveryPanel() {
       ].join('\n'),
     );
   const row = new ActionRowBuilder().addComponents(
-    require('discord.js').ButtonBuilder
-      ? new (require('discord.js').ButtonBuilder)()
-          .setCustomId('delivery_submit_btn')
-          .setLabel('บันทึกการส่งของ')
-          .setStyle(require('discord.js').ButtonStyle.Primary)
-          .setEmoji('📦')
-      : null,
-  );
-  // rebuild cleanly
-  const { ButtonBuilder, ButtonStyle } = require('discord.js');
-  const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('delivery_submit_btn')
       .setLabel('บันทึกการส่งของ')
       .setStyle(ButtonStyle.Primary)
       .setEmoji('📦'),
   );
-  return { embeds: [embed], components: [row2] };
+  return { embeds: [embed], components: [row] };
 }
 
 function storagePanelLive() {
-  const { ButtonBuilder, ButtonStyle } = require('discord.js');
   const embed = new EmbedBuilder()
     .setColor(0x8b5cf6)
     .setTitle('🍇 Storage Zone ! · คลังของแก๊ง')
@@ -105,178 +103,163 @@ function storagePanelLive() {
 }
 
 async function handleLogistics(interaction) {
-  const id = interaction.customId;
+  const id = interaction.customId || '';
 
-  if (id === 'delivery_submit_btn') {
-    const modal = new ModalBuilder().setCustomId('delivery_submit_modal').setTitle('บันทึกการส่งของ');
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId('item_name').setLabel('ชื่อของ').setStyle(TextInputStyle.Short).setRequired(true),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('quantity')
-          .setLabel('จำนวน')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setValue('1'),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('destination')
-          .setLabel('จุดส่ง / ผู้รับ')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('proof_url')
-          .setLabel('ลิงก์รูปหลักฐาน')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true),
-      ),
-    );
-    return interaction.showModal(modal);
-  }
+  try {
+    if (interaction.isButton()) {
+      if (id === 'delivery_submit_btn' || (id.includes('delivery') && !id.includes('modal'))) {
+        const modal = new ModalBuilder().setCustomId('delivery_submit_modal').setTitle('บันทึกการส่งของ');
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('item_name').setLabel('ชื่อของ').setStyle(TextInputStyle.Short).setRequired(true),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('quantity').setLabel('จำนวน').setStyle(TextInputStyle.Short).setRequired(true).setValue('1'),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('destination').setLabel('จุดส่ง / ผู้รับ').setStyle(TextInputStyle.Short).setRequired(true),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('proof_url').setLabel('ลิงก์รูปหลักฐาน').setStyle(TextInputStyle.Short).setRequired(true),
+          ),
+        );
+        return interaction.showModal(modal);
+      }
 
-  if (id === 'storage_withdraw_btn') {
-    const modal = new ModalBuilder().setCustomId('storage_withdraw_modal').setTitle('เบิกของจากคลัง');
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId('item_name').setLabel('ชื่อของ').setStyle(TextInputStyle.Short).setRequired(true),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('quantity')
-          .setLabel('จำนวนที่เบิก')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setValue('1'),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('proof_url')
-          .setLabel('ลิงก์รูปหลักฐาน')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true),
-      ),
-    );
-    return interaction.showModal(modal);
-  }
+      if (id === 'storage_withdraw_btn' || id.includes('withdraw')) {
+        const modal = new ModalBuilder().setCustomId('storage_withdraw_modal').setTitle('เบิกของจากคลัง');
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('item_name').setLabel('ชื่อของ').setStyle(TextInputStyle.Short).setRequired(true),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('quantity').setLabel('จำนวนที่เบิก').setStyle(TextInputStyle.Short).setRequired(true).setValue('1'),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('proof_url').setLabel('ลิงก์รูปหลักฐาน').setStyle(TextInputStyle.Short).setRequired(true),
+          ),
+        );
+        return interaction.showModal(modal);
+      }
 
-  if (id === 'storage_admin_btn') {
-    if (!isAdmin(interaction.member)) {
+      if (id === 'storage_admin_btn' || (id.includes('storage') && id.includes('admin'))) {
+        if (!isAdmin(interaction.member)) {
+          return interaction.reply({ content: '❌ เฉพาะแอดมิน', flags: MessageFlags.Ephemeral });
+        }
+        const modal = new ModalBuilder().setCustomId('storage_admin_modal').setTitle('จัดการคลัง (Admin)');
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('item_name').setLabel('ชื่อของ').setStyle(TextInputStyle.Short).setRequired(true),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('quantity').setLabel('จำนวนที่ตั้ง (ยอดรวมใหม่)').setStyle(TextInputStyle.Short).setRequired(true),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('note').setLabel('หมายเหตุ (ไม่บังคับ)').setStyle(TextInputStyle.Short).setRequired(false),
+          ),
+        );
+        return interaction.showModal(modal);
+      }
+
       return interaction.reply({
-        content: '❌ เฉพาะแอดมิน',
-        flags: MessageFlags.Ephemeral,
-      });
-    }
-    const modal = new ModalBuilder().setCustomId('storage_admin_modal').setTitle('จัดการคลัง (Admin)');
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId('item_name').setLabel('ชื่อของ').setStyle(TextInputStyle.Short).setRequired(true),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('quantity')
-          .setLabel('จำนวนที่ตั้ง (ยอดรวมใหม่)')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('note')
-          .setLabel('หมายเหตุ (ไม่บังคับ)')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false),
-      ),
-    );
-    return interaction.showModal(modal);
-  }
-
-  if (interaction.isModalSubmit() && id === 'delivery_submit_modal') {
-    const item = interaction.fields.getTextInputValue('item_name').trim();
-    const qty = parseInt(interaction.fields.getTextInputValue('quantity'), 10) || 1;
-    const dest = interaction.fields.getTextInputValue('destination').trim();
-    const proof = interaction.fields.getTextInputValue('proof_url').trim();
-    const logId = createDelivery(interaction.user.id, item, qty, dest, proof);
-
-    const embed = new EmbedBuilder()
-      .setColor(0x22c55e)
-      .setTitle('📦 บันทึกส่งของแล้ว')
-      .addFields(
-        { name: 'ของ', value: item, inline: true },
-        { name: 'จำนวน', value: String(qty), inline: true },
-        { name: 'จุดส่ง', value: dest, inline: true },
-        { name: 'โดย', value: `<@${interaction.user.id}>`, inline: true },
-        { name: 'หลักฐาน', value: proof },
-      )
-      .setFooter({ text: `Delivery #${logId}` })
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-
-    const logChId = config.channels.log;
-    if (logChId) {
-      const ch = await interaction.client.channels.fetch(logChId).catch(() => null);
-      if (ch) await ch.send({ embeds: [embed] }).catch(() => {});
-    }
-    return;
-  }
-
-  if (interaction.isModalSubmit() && id === 'storage_withdraw_modal') {
-    const item = interaction.fields.getTextInputValue('item_name').trim();
-    const qty = Math.abs(parseInt(interaction.fields.getTextInputValue('quantity'), 10) || 1);
-    const proof = interaction.fields.getTextInputValue('proof_url').trim();
-
-    const items = listStorageItems();
-    const found = items.find((i) => i.name.toLowerCase() === item.toLowerCase());
-    if (!found || found.quantity < qty) {
-      return interaction.reply({
-        content: `❌ ของไม่พอในคลัง (มี ${found ? found.quantity : 0})`,
+        content: 'ปุ่มนี้เป็นแผงเก่าหรือยังไม่รองรับ — ให้แอดมินรัน `/setup` ส่งแผงใหม่',
         flags: MessageFlags.Ephemeral,
       });
     }
 
-    upsertStorageItem(found.name, -qty);
-    logStorageAction(found.name, 'withdraw', qty, interaction.user.id, proof);
+    if (interaction.isModalSubmit() && id === 'delivery_submit_modal') {
+      const item = interaction.fields.getTextInputValue('item_name').trim();
+      const qty = parseInt(interaction.fields.getTextInputValue('quantity'), 10) || 1;
+      const dest = interaction.fields.getTextInputValue('destination').trim();
+      const proof = interaction.fields.getTextInputValue('proof_url').trim();
+      const logId = createDelivery(interaction.user.id, item, qty, dest, proof);
 
-    const embed = new EmbedBuilder()
-      .setColor(0xf59e0b)
-      .setTitle('📥 เบิกของแล้ว')
-      .setDescription(`**${found.name}** × ${qty}\nเหลือในคลัง: **${found.quantity - qty}**`)
-      .addFields(
-        { name: 'โดย', value: `<@${interaction.user.id}>`, inline: true },
-        { name: 'หลักฐาน', value: proof },
-      )
-      .setTimestamp();
+      const embed = new EmbedBuilder()
+        .setColor(0x22c55e)
+        .setTitle('📦 บันทึกส่งของแล้ว')
+        .addFields(
+          { name: 'ของ', value: item, inline: true },
+          { name: 'จำนวน', value: String(qty), inline: true },
+          { name: 'จุดส่ง', value: dest, inline: true },
+          { name: 'โดย', value: `<@${interaction.user.id}>`, inline: true },
+          { name: 'หลักฐาน', value: proof },
+        )
+        .setFooter({ text: `Delivery #${logId}` })
+        .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-
-    if (interaction.message?.editable) {
-      await interaction.message.edit(storagePanelLive()).catch(() => {});
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      const logChId = config.channels?.log || process.env.LOG_CHANNEL_ID;
+      if (logChId) {
+        const ch = await interaction.client.channels.fetch(logChId).catch(() => null);
+        if (ch) await ch.send({ embeds: [embed] }).catch(() => {});
+      }
+      return;
     }
-    return;
-  }
 
-  if (interaction.isModalSubmit() && id === 'storage_admin_modal') {
-    if (!isAdmin(interaction.member)) {
-      return interaction.reply({ content: '❌ เฉพาะแอดมิน', flags: MessageFlags.Ephemeral });
+    if (interaction.isModalSubmit() && id === 'storage_withdraw_modal') {
+      const item = interaction.fields.getTextInputValue('item_name').trim();
+      const qty = Math.abs(parseInt(interaction.fields.getTextInputValue('quantity'), 10) || 1);
+      const proof = interaction.fields.getTextInputValue('proof_url').trim();
+      const items = listStorageItems();
+      const found = items.find((i) => i.name.toLowerCase() === item.toLowerCase());
+      if (!found || found.quantity < qty) {
+        return interaction.reply({
+          content: `❌ ของไม่พอในคลัง (มี ${found ? found.quantity : 0})\nให้แอดมินกด **จัดการคลัง** เพิ่มของก่อน`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      upsertStorageItem(found.name, -qty);
+      logStorageAction(found.name, 'withdraw', qty, interaction.user.id, proof);
+
+      const embed = new EmbedBuilder()
+        .setColor(0xf59e0b)
+        .setTitle('📥 เบิกของแล้ว')
+        .setDescription(`**${found.name}** × ${qty}\nเหลือในคลัง: **${found.quantity - qty}**`)
+        .addFields(
+          { name: 'โดย', value: `<@${interaction.user.id}>`, inline: true },
+          { name: 'หลักฐาน', value: proof },
+        )
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      try {
+        if (interaction.message?.editable) await interaction.message.edit(storagePanelLive());
+      } catch { /* ignore */ }
+      return;
     }
-    const item = interaction.fields.getTextInputValue('item_name').trim();
-    const qty = Math.max(0, parseInt(interaction.fields.getTextInputValue('quantity'), 10) || 0);
-    const note = interaction.fields.getTextInputValue('note') || null;
-    setStorageQuantity(item, qty, note);
-    logStorageAction(item, 'set', qty, interaction.user.id, null, note);
 
-    await interaction.reply({
-      content: `✅ ตั้งคลัง **${item}** = ${qty} แล้ว`,
-      flags: MessageFlags.Ephemeral,
-    });
-
-    if (interaction.message?.editable) {
-      await interaction.message.edit(storagePanelLive()).catch(() => {});
+    if (interaction.isModalSubmit() && id === 'storage_admin_modal') {
+      if (!isAdmin(interaction.member)) {
+        return interaction.reply({ content: '❌ เฉพาะแอดมิน', flags: MessageFlags.Ephemeral });
+      }
+      const item = interaction.fields.getTextInputValue('item_name').trim();
+      const qty = Math.max(0, parseInt(interaction.fields.getTextInputValue('quantity'), 10) || 0);
+      const note = interaction.fields.getTextInputValue('note') || null;
+      setStorageQuantity(item, qty, note);
+      logStorageAction(item, 'set', qty, interaction.user.id, null, note);
+      await interaction.reply({
+        content: `✅ ตั้งคลัง **${item}** = ${qty} แล้ว`,
+        flags: MessageFlags.Ephemeral,
+      });
+      try {
+        if (interaction.message?.editable) await interaction.message.edit(storagePanelLive());
+      } catch { /* ignore */ }
+      return;
     }
+
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: 'ไม่สามารถประมวลผลได้ — ลองแผงใหม่จาก `/setup`',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+  } catch (err) {
+    console.error('logistics error:', err);
+    try {
+      const msg = { content: `ระบบคลัง/ส่งของผิดพลาด: ${err.message}`, flags: MessageFlags.Ephemeral };
+      if (interaction.replied || interaction.deferred) await interaction.followUp(msg);
+      else await interaction.reply(msg);
+    } catch { /* ignore */ }
   }
 }
 
