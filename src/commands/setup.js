@@ -3,11 +3,13 @@ const {
   ChannelType,
   PermissionFlagsBits,
   EmbedBuilder,
+  Colors,
 } = require('discord.js');
 const { setSetting } = require('../database');
 const { sendAllPanels } = require('../panels/systemPanels');
 const { sendRosterPanel } = require('../panels/rosterPanel');
 const { isAdmin } = require('../utils/permissions');
+const config = require('../config');
 
 const CHANNELS = {
   control: {
@@ -75,16 +77,40 @@ const CHANNELS = {
 const CATEGORY_SYSTEM = '🍇 ‧ BABY GRAPE SYSTEM';
 const CATEGORY_ARCHIVE = '🗄️ ‧ heist˗archive';
 
+const ROLES = [
+  {
+    key: 'admin',
+    name: '🍇 ‧ BG Admin',
+    aliases: ['BG Admin', 'Baby Grape Admin'],
+    color: Colors.Purple,
+    hoist: true,
+  },
+  {
+    key: 'helper',
+    name: '🛠️ ‧ BG Helper',
+    aliases: ['BG Helper', 'Helper'],
+    color: Colors.Blue,
+    hoist: true,
+  },
+  {
+    key: 'member',
+    name: '👤 ‧ BG Member',
+    aliases: ['BG Member', 'Member'],
+    color: Colors.Green,
+    hoist: false,
+  },
+];
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setup')
-    .setDescription('สร้างห้อง + แผงปุ่ม Baby Grape System (แอดมิน)')
+    .setDescription('สร้างห้อง + ยศ + แผงปุ่ม Baby Grape System (แอดมิน)')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addBooleanOption((opt) =>
-      opt.setName('force').setDescription('สร้างใหม่แม้มีชื่อห้องซ้ำแล้ว').setRequired(false),
+      opt.setName('force').setDescription('สร้างใหม่แม้มีชื่อซ้ำแล้ว').setRequired(false),
     )
     .addBooleanOption((opt) =>
-      opt.setName('rename').setDescription('เปลี่ยนชื่อห้องเดิมให้สวยขึ้น (default: เปิด)').setRequired(false),
+      opt.setName('rename').setDescription('เปลี่ยนชื่อห้อง/ยศเดิมให้สวยขึ้น').setRequired(false),
     ),
 
   async execute(interaction) {
@@ -97,7 +123,6 @@ module.exports = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    // เซิร์ฟใหม่บางที interaction.guild ยัง null — ดึงจาก guildId
     let guild = interaction.guild;
     if (!guild && interaction.guildId) {
       try {
@@ -110,11 +135,10 @@ module.exports = {
       return interaction.editReply({
         content:
           'ใช้คำสั่งนี้ใน**ห้องของเซิร์ฟเวอร์**เท่านั้น (ไม่ใช่แชทส่วนตัว)\n' +
-          'ถ้าอยู่บนเซิร์ฟอยู่แล้ว: เชิญบอทเข้าเซิร์ฟอีกครั้ง แล้วเปิดสิทธิ์ **Manage Channels**',
+          'ถ้าอยู่บนเซิร์ฟอยู่แล้ว: เชิญบอทเข้าเซิร์ฟอีกครั้ง แล้วเปิดสิทธิ์ **Manage Channels** + **Manage Roles**',
       });
     }
 
-    // ตรวจว่าบอทมีสิทธิ์สร้างห้อง
     const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
     if (me && !me.permissions.has(PermissionFlagsBits.ManageChannels)) {
       return interaction.editReply({
@@ -190,7 +214,9 @@ module.exports = {
           } catch { /* ignore */ }
         }
         if (topic && existing.topic !== topic) {
-          try { await existing.setTopic(topic); } catch { /* ignore */ }
+          try {
+            await existing.setTopic(topic);
+          } catch { /* ignore */ }
         }
         reused.push(`#${existing.name}`);
         return existing;
@@ -207,15 +233,66 @@ module.exports = {
       return ch;
     }
 
-    try {
-      // โหลดช่องที่มีอยู่ให้ครบ
-      await guild.channels.fetch().catch(() => null);
+    async function findOrCreateRole(def) {
+      const { name, aliases = [], color, hoist } = def;
+      let role = guild.roles.cache.find(
+        (r) =>
+          !r.managed &&
+          (r.name === name || aliases.some((a) => r.name === a || r.name.includes(a))),
+      );
+      if (role && !force) {
+        if (shouldRename && role.name !== name && role.editable) {
+          try {
+            await role.setName(name, 'BabyGrape role rename');
+            renamed.push(`ยศ → ${name}`);
+          } catch (e) {
+            console.warn('rename role failed', e.message);
+          }
+        }
+        reused.push(`@${role.name}`);
+        return role;
+      }
+      role = await guild.roles.create({
+        name,
+        color,
+        hoist: !!hoist,
+        mentionable: false,
+        reason: 'BabyGrape /setup',
+      });
+      created.push(`@${name}`);
+      return role;
+    }
 
+    try {
+      await guild.channels.fetch().catch(() => null);
+      await guild.roles.fetch().catch(() => null);
+
+      // --- Roles ---
+      let adminRole = null;
+      let helperRole = null;
+      let memberRole = null;
+      if (me && !me.permissions.has(PermissionFlagsBits.ManageRoles)) {
+        created.push('(ข้ามสร้างยศ — บอทไม่มี Manage Roles)');
+      } else {
+        try {
+          adminRole = await findOrCreateRole(ROLES[0]);
+          helperRole = await findOrCreateRole(ROLES[1]);
+          memberRole = await findOrCreateRole(ROLES[2]);
+        } catch (e) {
+          console.warn('role setup failed:', e.message);
+          created.push(`(สร้างยศไม่สำเร็จ: ${e.message})`);
+        }
+      }
+
+      // --- Channels ---
       const archiveCat = await findOrCreateCategory(CATEGORY_ARCHIVE, [
-        'heist-archive', 'heist˗archive', 'archive',
+        'heist-archive',
+        'heist˗archive',
+        'archive',
       ]);
       const systemCat = await findOrCreateCategory(CATEGORY_SYSTEM, [
-        'BABY GRAPE', 'Baby Grape',
+        'BABY GRAPE',
+        'Baby Grape',
       ]);
 
       const control = await findOrCreateText(CHANNELS.control, systemCat);
@@ -245,10 +322,16 @@ module.exports = {
         DELIVERY_CHANNEL_ID: deliveryCh.id,
         STORAGE_CHANNEL_ID: storageCh.id,
       };
+      if (adminRole) mapping.ADMIN_ROLE_ID = adminRole.id;
+      if (helperRole) mapping.HELPER_ROLE_ID = helperRole.id;
+      if (memberRole) mapping.MEMBER_ROLE_ID = memberRole.id;
 
       for (const [key, value] of Object.entries(mapping)) {
         setSetting(key.toLowerCase(), value);
         process.env[key] = value;
+      }
+      if (mapping.ADMIN_ROLE_ID) {
+        config.roles.admin = mapping.ADMIN_ROLE_ID;
       }
 
       const panelResults = await sendAllPanels(guild, {
@@ -273,9 +356,14 @@ module.exports = {
         .map(([k, v]) => `${k}=${v}`)
         .join('\n');
 
+      const roleLine = [adminRole, helperRole, memberRole]
+        .filter(Boolean)
+        .map((r) => `${r}`)
+        .join(' · ');
+
       const embed = new EmbedBuilder()
         .setColor(0x8b5cf6)
-        .setTitle('✨ Setup เสร็จ — ห้องสวยพร้อมแผงแล้ว')
+        .setTitle('✨ Setup เสร็จ — ห้อง + ยศ + แผงพร้อมแล้ว')
         .setDescription(
           [
             created.length ? `**สร้างใหม่**\n${created.map((x) => `✦ ${x}`).join('\n')}` : null,
@@ -284,18 +372,21 @@ module.exports = {
               ? `**ใช้ของเดิม**\n${reused.map((x) => `• ${x}`).join('\n')}`
               : null,
             '',
+            roleLine ? `₊˚ ยศระบบ: ${roleLine}` : null,
             '₊˚ แผงจัดการอยู่ที่ **🎛️ ‧ heist˗score** ‧₊˚',
             '₊˚ รายชื่อสมาชิกอยู่ที่ **👥 ‧ รายชื่อ** ‧₊˚',
-            '₊˚ ส่งของ / คลัง พร้อมใช้งาน ‧₊˚',
-          ].filter(Boolean).join('\n'),
+          ]
+            .filter(Boolean)
+            .join('\n'),
         )
         .addFields(
           {
             name: '‧ แผงที่ส่งแล้ว',
-            value: (panelResults || []).slice(0, 14).map((x) => `• ${x}`).join('\n') || '—',
+            value:
+              (panelResults || []).slice(0, 14).map((x) => `• ${x}`).join('\n') || '—',
           },
           {
-            name: '‧ Channel IDs',
+            name: '‧ IDs',
             value: '```env\n' + envBlock.slice(0, 900) + '\n```',
           },
         )
@@ -305,7 +396,9 @@ module.exports = {
       await interaction.editReply({ embeds: [embed] });
     } catch (err) {
       console.error('/setup failed:', err);
-      await interaction.editReply({ content: `❌ Setup ล้มเหลว: ${err.message}` });
+      await interaction.editReply({
+        content: `❌ Setup ล้มเหลว: ${err.message}`,
+      });
     }
   },
 };
