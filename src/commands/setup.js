@@ -36,11 +36,6 @@ const CHANNELS = {
     aliases: ['ส่งของ', '📦'],
     topic: '₊˚ ระบบส่งของ ‧₊˚',
   },
-  score: {
-    name: '📊 ‧ ตารางคะแนน',
-    aliases: ['ตารางคะแนน', '📊'],
-    topic: '₊˚ กระดานคะแนน Weekly / Monthly ‧₊˚',
-  },
   leaveSummary: {
     name: '📋 ‧ สรุปคนลา',
     aliases: ['สรุปคนลา', '📋'],
@@ -140,7 +135,7 @@ module.exports = {
 
   async execute(interaction) {
     if (!isAdmin(interaction.member)) {
-      return interaction.reply({ content: '❌ คำสั่งนี้สำหรับแอดมินเท่านั้นนะคับ', ephemeral: true });
+      return interaction.reply({ content: '❌ สำหรับแอดมินเท่านั้น', ephemeral: true });
     }
 
     await interaction.deferReply({ ephemeral: true });
@@ -155,16 +150,13 @@ module.exports = {
     }
     if (!guild) {
       return interaction.editReply({
-        content:
-          '❌ **บอทยังไม่ได้อยู่ในเซิร์ฟนี้**\n\n🔗 **เชิญบอท:**\n' + INVITE_URL,
+        content: '❌ บอทยังไม่ได้อยู่ในเซิร์ฟนี้\n\n🔗 ' + INVITE_URL,
       });
     }
 
     const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
     if (me && !me.permissions.has(PermissionFlagsBits.ManageChannels)) {
-      return interaction.editReply({
-        content: '❌ บอทไม่มีสิทธิ์ Manage Channels\n\n' + INVITE_URL,
-      });
+      return interaction.editReply({ content: '❌ บอทไม่มีสิทธิ์ Manage Channels\n' + INVITE_URL });
     }
 
     const force = interaction.options.getBoolean('force') || false;
@@ -187,7 +179,7 @@ module.exports = {
             await cat.setName(name, 'BabyGrape rename');
             renamed.push(`หมวด → ${name}`);
           } catch (e) {
-            console.warn('rename category failed', e.message);
+            console.warn(e.message);
           }
         }
         reused.push(`หมวด ${cat.name}`);
@@ -215,17 +207,12 @@ module.exports = {
             await existing.setName(name, 'BabyGrape pretty name');
             renamed.push(`→ ${name}`);
           } catch (e) {
-            console.warn('rename failed', e.message);
+            console.warn(e.message);
           }
         }
         if (parent && existing.parentId !== parent.id) {
           try {
             await existing.setParent(parent.id, { reason: 'BabyGrape setup' });
-          } catch { /* ignore */ }
-        }
-        if (topic && existing.topic !== topic) {
-          try {
-            await existing.setTopic(topic);
           } catch { /* ignore */ }
         }
         reused.push(`#${existing.name}`);
@@ -255,14 +242,14 @@ module.exports = {
             await role.setName(name, 'BabyGrape role rename');
             renamed.push(`ยศ → ${name}`);
           } catch (e) {
-            console.warn('rename role failed', e.message);
+            console.warn(e.message);
           }
         }
         if (role.editable && permissions) {
           try {
             await role.setPermissions(permissions, 'BabyGrape role permissions');
           } catch (e) {
-            console.warn('setPermissions failed', role.name, e.message);
+            console.warn(e.message);
           }
         }
         reused.push(`@${role.name}`);
@@ -287,15 +274,12 @@ module.exports = {
       let adminRole = null;
       let helperRole = null;
       let memberRole = null;
-      if (me && !me.permissions.has(PermissionFlagsBits.ManageRoles)) {
-        created.push('(ข้ามสร้างยศ — บอทไม่มี Manage Roles)');
-      } else {
+      if (!(me && !me.permissions.has(PermissionFlagsBits.ManageRoles))) {
         try {
           adminRole = await findOrCreateRole(ROLES[0]);
           helperRole = await findOrCreateRole(ROLES[1]);
           memberRole = await findOrCreateRole(ROLES[2]);
         } catch (e) {
-          console.warn('role setup failed:', e.message);
           created.push(`(สร้างยศไม่สำเร็จ: ${e.message})`);
         }
       }
@@ -305,51 +289,25 @@ module.exports = {
         'heist˗archive',
         'archive',
       ]);
-      const systemCat = await findOrCreateCategory(CATEGORY_SYSTEM, [
-        'BABY GRAPE',
-        'Baby Grape',
-      ]);
+      const systemCat = await findOrCreateCategory(CATEGORY_SYSTEM, ['BABY GRAPE', 'Baby Grape']);
 
       const control = await findOrCreateText(CHANNELS.control, systemCat);
       const leaveCh = await findOrCreateText(CHANNELS.leave, systemCat);
       const checkinCh = await findOrCreateText(CHANNELS.checkin, systemCat);
       const deliveryCh = await findOrCreateText(CHANNELS.delivery, systemCat);
-      // ไม่สร้างห้องคลังของแก๊ง
-      const storageCh = null;
-      const score = await findOrCreateText(CHANNELS.score, systemCat);
       await findOrCreateText(CHANNELS.leaveSummary, systemCat);
       await findOrCreateText(CHANNELS.checkinSummary, systemCat);
       const rosterCh = await findOrCreateText(CHANNELS.roster, systemCat);
       const log = await findOrCreateText(CHANNELS.log, systemCat);
+      // ไม่สร้าง: ตารางคะแนน / คลัง / heist-score / heist-chat
 
-      // หมวด BABY GRAPE: ต้องมียศถึงมองเห็น
+      // หมวดเห็นเฉพาะยศ BG
       try {
-        const overwrites = [
-          { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-        ];
-        if (adminRole) {
+        const overwrites = [{ id: guild.id, deny: [PermissionFlagsBits.ViewChannel] }];
+        for (const role of [adminRole, helperRole, memberRole]) {
+          if (!role) continue;
           overwrites.push({
-            id: adminRole.id,
-            allow: [
-              PermissionFlagsBits.ViewChannel,
-              PermissionFlagsBits.SendMessages,
-              PermissionFlagsBits.ReadMessageHistory,
-            ],
-          });
-        }
-        if (helperRole) {
-          overwrites.push({
-            id: helperRole.id,
-            allow: [
-              PermissionFlagsBits.ViewChannel,
-              PermissionFlagsBits.SendMessages,
-              PermissionFlagsBits.ReadMessageHistory,
-            ],
-          });
-        }
-        if (memberRole) {
-          overwrites.push({
-            id: memberRole.id,
+            id: role.id,
             allow: [
               PermissionFlagsBits.ViewChannel,
               PermissionFlagsBits.SendMessages,
@@ -375,45 +333,17 @@ module.exports = {
           try {
             await ch.permissionOverwrites.set(overwrites);
           } catch (e) {
-            console.warn('child overwrite', ch.name, e.message);
+            console.warn(ch.name, e.message);
           }
         }
       } catch (e) {
-        console.warn('category role-gate failed:', e.message);
-      }
-
-      if (log && adminRole) {
-        try {
-          await log.permissionOverwrites.edit(guild.id, { ViewChannel: false });
-          await log.permissionOverwrites.edit(adminRole.id, {
-            ViewChannel: true,
-            SendMessages: true,
-            ReadMessageHistory: true,
-          });
-          if (helperRole) {
-            await log.permissionOverwrites.edit(helperRole.id, {
-              ViewChannel: true,
-              ReadMessageHistory: true,
-            });
-          }
-          if (me) {
-            await log.permissionOverwrites.edit(me.id, {
-              ViewChannel: true,
-              SendMessages: true,
-              EmbedLinks: true,
-              ManageMessages: true,
-            });
-          }
-        } catch (e) {
-          console.warn('log overwrite failed', e.message);
-        }
+        console.warn('role-gate', e.message);
       }
 
       const mapping = {
         GUILD_ID: guild.id,
         CONTROL_CHANNEL_ID: control.id,
         LOG_CHANNEL_ID: log.id,
-        SCORE_CHANNEL_ID: score.id,
         ARCHIVE_CATEGORY_ID: archiveCat.id,
         LEAVE_CHANNEL_ID: leaveCh.id,
         CHECKIN_CHANNEL_ID: checkinCh.id,
@@ -436,9 +366,9 @@ module.exports = {
         checkin: checkinCh,
         storage: null,
         delivery: deliveryCh,
-        score,
+        score: null,
         log,
-        admin: log,
+        admin: null,
       });
 
       try {
@@ -451,7 +381,6 @@ module.exports = {
       const envBlock = Object.entries(mapping)
         .map(([k, v]) => `${k}=${v}`)
         .join('\n');
-
       const roleLine = [adminRole, helperRole, memberRole]
         .filter(Boolean)
         .map((r) => `${r}`)
@@ -459,43 +388,32 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setColor(0x8b5cf6)
-        .setTitle('✨ Setup เสร็จ — ห้อง + ยศ + แผงพร้อมแล้ว')
+        .setTitle('✨ Setup เสร็จ')
         .setDescription(
           [
-            created.length ? `**สร้าง/ตั้งค่า**\n${created.map((x) => `✦ ${x}`).join('\n')}` : null,
-            renamed.length ? `**เปลี่ยนชื่อ**\n${renamed.map((x) => `✧ ${x}`).join('\n')}` : null,
-            reused.length && !renamed.length
-              ? `**ใช้ของเดิม**\n${reused.map((x) => `• ${x}`).join('\n')}`
-              : null,
-            '',
+            created.length ? `**สร้าง**\n${created.map((x) => `✦ ${x}`).join('\n')}` : null,
+            reused.length ? `**ใช้ของเดิม**\n${reused.map((x) => `• ${x}`).join('\n')}` : null,
             roleLine ? `₊˚ ยศ: ${roleLine}` : null,
-            '₊˚ **ไม่สร้าง** heist-score / heist-chat / คลังของแก๊ง',
-            '₊˚ แผงแอดมินอยู่ที่ **ประวัติ-log**',
-            '₊˚ หมวด BABY GRAPE เห็นเฉพาะผู้มียศ BG Admin / Helper / Member',
-            '₊˚ ตารางคะแนน + ปุ่มตัดยอดคะแนน พร้อมใช้',
+            '₊˚ **ไม่สร้าง** ตารางคะแนน / ตัดยอด / แผงแอดมิน / คลัง / heist-score',
+            '₊˚ หมวดเห็นเฉพาะยศ BG',
+            '₊˚ แผง: ลงทะเบียน · แจ้งลา · เช็คชื่อ · ส่งของ · รายชื่อ',
           ]
             .filter(Boolean)
             .join('\n'),
         )
         .addFields(
           {
-            name: '‧ แผงที่ส่งแล้ว',
-            value: (panelResults || []).slice(0, 14).map((x) => `• ${x}`).join('\n') || '—',
+            name: '‧ แผง',
+            value: (panelResults || []).slice(0, 12).map((x) => `• ${x}`).join('\n') || '—',
           },
-          {
-            name: '‧ IDs',
-            value: '```env\n' + envBlock.slice(0, 900) + '\n```',
-          },
+          { name: '‧ IDs', value: '```env\n' + envBlock.slice(0, 900) + '\n```' },
         )
-        .setFooter({ text: 'Baby Grape System ‧ setup' })
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
     } catch (err) {
       console.error('/setup failed:', err);
-      await interaction.editReply({
-        content: `❌ Setup ล้มเหลว: ${err.message}\n\n` + INVITE_URL,
-      });
+      await interaction.editReply({ content: `❌ ${err.message}\n` + INVITE_URL });
     }
   },
 };
