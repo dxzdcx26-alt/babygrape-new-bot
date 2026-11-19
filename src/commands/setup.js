@@ -89,14 +89,39 @@ module.exports = {
 
   async execute(interaction) {
     if (!isAdmin(interaction.member)) {
-      return interaction.reply({ content: '❌ คำสั่งนี้สำหรับแอดมินเท่านั้นนะคับ', ephemeral: true });
+      return interaction.reply({
+        content: '❌ คำสั่งนี้สำหรับแอดมินเท่านั้นนะคับ',
+        ephemeral: true,
+      });
     }
 
     await interaction.deferReply({ ephemeral: true });
 
-    const guild = interaction.guild;
+    // เซิร์ฟใหม่บางที interaction.guild ยัง null — ดึงจาก guildId
+    let guild = interaction.guild;
+    if (!guild && interaction.guildId) {
+      try {
+        guild = await interaction.client.guilds.fetch(interaction.guildId);
+      } catch (e) {
+        console.warn('fetch guild failed:', e.message);
+      }
+    }
     if (!guild) {
-      return interaction.editReply({ content: 'ใช้คำสั่งนี้ในเซิร์ฟเวอร์เท่านั้น' });
+      return interaction.editReply({
+        content:
+          'ใช้คำสั่งนี้ใน**ห้องของเซิร์ฟเวอร์**เท่านั้น (ไม่ใช่แชทส่วนตัว)\n' +
+          'ถ้าอยู่บนเซิร์ฟอยู่แล้ว: เชิญบอทเข้าเซิร์ฟอีกครั้ง แล้วเปิดสิทธิ์ **Manage Channels**',
+      });
+    }
+
+    // ตรวจว่าบอทมีสิทธิ์สร้างห้อง
+    const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
+    if (me && !me.permissions.has(PermissionFlagsBits.ManageChannels)) {
+      return interaction.editReply({
+        content:
+          '❌ บอทยังไม่มีสิทธิ์ **Manage Channels**\n' +
+          'ไปที่ Server Settings → Roles → ยศของบอท → เปิด Manage Channels แล้วลอง `/setup` อีกครั้ง',
+      });
     }
 
     const force = interaction.options.getBoolean('force') || false;
@@ -183,6 +208,9 @@ module.exports = {
     }
 
     try {
+      // โหลดช่องที่มีอยู่ให้ครบ
+      await guild.channels.fetch().catch(() => null);
+
       const archiveCat = await findOrCreateCategory(CATEGORY_ARCHIVE, [
         'heist-archive', 'heist˗archive', 'archive',
       ]);
