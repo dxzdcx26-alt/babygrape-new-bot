@@ -4,8 +4,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require('discord.js');
-
-/** แผงปุ่ม Baby Grape — ใช้หลัง /setup */
+const { storagePanelLive, deliveryPanel } = require('../interactions/logistics');
 
 function activityPanel() {
   const embed = new EmbedBuilder()
@@ -86,37 +85,9 @@ function checkinPanel() {
 }
 
 function storagePanel() {
-  const embed = new EmbedBuilder()
-    .setColor(0x8b5cf6)
-    .setTitle('🍇 Storage Zone ! · คลังของแก๊ง')
-    .setDescription(
-      [
-        '**Current Stock**',
-        '✕ คลังว่างเปล่า (Empty)',
-        '',
-        '**วิธีใช้งาน**',
-        '• กดปุ่ม "เบิกของ" เพื่อเบิกของจากคลัง',
-        '• ต้องใส่ลิงก์รูปหลักฐาน ทุกครั้ง',
-        '',
-        `*Updated: ${new Date().toLocaleString('th-TH')} · Baby Grape System 🍇*`,
-      ].join('\n'),
-    );
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('storage_withdraw_btn')
-      .setLabel('เบิกของ')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('📥'),
-    new ButtonBuilder()
-      .setCustomId('storage_admin_btn')
-      .setLabel('จัดการคลัง (Admin)')
-      .setStyle(ButtonStyle.Secondary)
-      .setEmoji('🛡️'),
-  );
-  return { embeds: [embed], components: [row] };
+  return storagePanelLive();
 }
 
-/** Control Panel — ข้อความตามต้นฉบับที่ผู้ใช้ส่งมา */
 function adminPanel() {
   const description = [
     '⸝ **Baby Grape Control Panel** 𓂃 ✿',
@@ -140,47 +111,19 @@ function adminPanel() {
 
   const rows = [
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('admin_channel_settings')
-        .setLabel('ตั้งค่าห้อง')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('📌'),
-      new ButtonBuilder()
-        .setCustomId('admin_activities')
-        .setLabel('กิจกรรม')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('🎮'),
-      new ButtonBuilder()
-        .setCustomId('admin_checkin')
-        .setLabel('เช็คชื่อ')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('📅'),
+      new ButtonBuilder().setCustomId('admin_channel_settings').setLabel('ตั้งค่าห้อง').setStyle(ButtonStyle.Secondary).setEmoji('📌'),
+      new ButtonBuilder().setCustomId('admin_activities').setLabel('กิจกรรม').setStyle(ButtonStyle.Secondary).setEmoji('🎮'),
+      new ButtonBuilder().setCustomId('admin_checkin').setLabel('เช็คชื่อ').setStyle(ButtonStyle.Secondary).setEmoji('📅'),
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('admin_roles')
-        .setLabel('ตั้งค่ายศ')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('👮'),
+      new ButtonBuilder().setCustomId('admin_roles').setLabel('ตั้งค่ายศ').setStyle(ButtonStyle.Secondary).setEmoji('👮'),
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('admin_extra')
-        .setLabel('ตั้งค่าเพิ่มเติม')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('⚙️'),
-      new ButtonBuilder()
-        .setCustomId('admin_delivery')
-        .setLabel('ระบบส่งของ')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('📦'),
+      new ButtonBuilder().setCustomId('admin_extra').setLabel('ตั้งค่าเพิ่มเติม').setStyle(ButtonStyle.Secondary).setEmoji('⚙️'),
+      new ButtonBuilder().setCustomId('admin_delivery').setLabel('ระบบส่งของ').setStyle(ButtonStyle.Secondary).setEmoji('📦'),
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('admin_storage')
-        .setLabel('คลังแก๊ง')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('🏭'),
+      new ButtonBuilder().setCustomId('admin_storage').setLabel('คลังแก๊ง').setStyle(ButtonStyle.Secondary).setEmoji('🏭'),
     ),
   ];
   return { embeds: [embed], components: rows };
@@ -235,7 +178,8 @@ async function sendAllPanels(guild, channels) {
   await post(channels.control, activityPanel(), 'ลงทะเบียนกิจกรรม');
   await post(channels.leave, leavePanel(), 'แจ้งลา');
   await post(channels.checkin, checkinPanel(), 'เช็คชื่อ');
-  await post(channels.storage, storagePanel(), 'คลังของแก๊ง');
+  await post(channels.storage, storagePanelLive(), 'คลังของแก๊ง');
+  await post(channels.delivery, deliveryPanel(), 'ส่งของ');
 
   if (channels.score) {
     try {
@@ -261,6 +205,8 @@ module.exports = {
   leavePanel,
   checkinPanel,
   storagePanel,
+  storagePanelLive,
+  deliveryPanel,
   adminPanel,
   sendAllPanels,
 };
