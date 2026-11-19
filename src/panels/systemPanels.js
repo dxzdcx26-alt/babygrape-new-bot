@@ -12,14 +12,13 @@ function activityPanel() {
     .setTitle('🍇 Activity Zone !')
     .setDescription(
       [
-        '**ใช้สำหรับบันทึกการเข้าร่วมกิจกรรม**',
+        '**ใช้สำหรับลงทะเบียนกิจกรรม / Heist Report**',
         '',
-        '**Guideline**',
-        '• เงื่อนไขการนับคะแนน — ระบบจะนับคะแนนให้เฉพาะผู้ที่กดปุ่มด้านล่างเท่านั้น',
-        '• วิธีการบันทึก — โปรดเลือกรายชื่อให้ครบทุกคน (รวมถึงตัวเองด้วย)',
-        '• หากมีข้อสงสัย สามารถติดต่อให้แอดมินช่วยตรวจสอบได้',
+        '• กดปุ่มด้านล่างเพื่อเริ่มลงทะเบียน',
+        '• เลือกประเภทกิจกรรม ช่วงเวลา และสมาชิก',
+        '• แนบหลักฐานตามขั้นตอนที่ระบบกำหนด',
         '',
-        '*Enjoy Activities ! · Baby Grape System 🍇*',
+        '*Baby Grape System · Activity Report 🍇*',
       ].join('\n'),
     );
   const row = new ActionRowBuilder().addComponents(
@@ -35,25 +34,24 @@ function activityPanel() {
 function leavePanel() {
   const embed = new EmbedBuilder()
     .setColor(0x8b5cf6)
-    .setTitle('🍇 Leave Zone !')
+    .setTitle('✈️ Leave Zone !')
     .setDescription(
       [
-        '**ระบบบันทึกการลา**',
+        '**ระบบแจ้งลา**',
         '',
-        '**Guideline**',
-        '• เลือกวันที่ต้องการลาให้ถูกต้อง',
-        '• ระบุประเภทและเหตุผลสั้น ๆ',
-        '• ระบบจะบันทึกข้อมูลและแจ้งเตือนผู้ดูแลให้อัตโนมัติ',
+        '• กดปุ่มเพื่อเปิดฟอร์มแจ้งลา',
+        '• กรอกวันที่ ประเภท และเหตุผล',
+        '• แอดมินจะตรวจสอบรายการในระบบ',
         '',
-        '*Take care and see you soon ! · Baby Grape System 🍇*',
+        '*Baby Grape System · Leave 🍇*',
       ].join('\n'),
     );
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('leave_request_btn')
       .setLabel('แจ้งลา')
-      .setStyle(ButtonStyle.Secondary)
-      .setEmoji('📝'),
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('✈️'),
   );
   return { embeds: [embed], components: [row] };
 }
@@ -61,12 +59,11 @@ function leavePanel() {
 function checkinPanel() {
   const embed = new EmbedBuilder()
     .setColor(0x8b5cf6)
-    .setTitle('🍇 Check-in Zone !')
+    .setTitle('📌 Check-in Zone !')
     .setDescription(
       [
         '**ระบบเช็คชื่อ**',
         '',
-        '**Guideline**',
         '• ใช้สำหรับเช็คชื่อเข้าร่วมกิจกรรมหรือช่วงเวลาที่กำหนด',
         '• เลือกรอบเช็คชื่อจากระบบที่แอดมินเปิดไว้',
         '• ระบบจะบันทึกเวลาเช็คชื่อให้อัตโนมัติ',
@@ -78,8 +75,8 @@ function checkinPanel() {
     new ButtonBuilder()
       .setCustomId('checkin_join_btn')
       .setLabel('เช็คชื่อ')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('📌'),
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('✅'),
   );
   return { embeds: [embed], components: [row] };
 }
@@ -89,41 +86,72 @@ function storagePanel() {
 }
 
 function adminPanel() {
-  const description = [
-    '⸝ **Baby Grape Control Panel** 𓂃 ✿',
-    '﹒ 🍇﹕ ✼ ﹒ **Admin Zone !**   ♡   ยินดีต้อนรับสู่หลังบ้านของ Baby Grape นะคะ   ⋆   ⁺',
-    '☁️ ﹒ กรุณาเลือกเมนูที่ต้องการตั้งค่าด้านล่าง',
-    '',
-    '╭ ꔫ ﹒ 📍 **ระบบห้อง**  (Channels)',
-    '˙ ╰ ┈ ‧₊˚ ตั้งค่าห้องวางปุ่มและ Panel (แจ้งลา / กิจกรรม / เช็คชื่อ / Leaderboard / Log)',
-    '╭ ꔫ ﹒ 🎮 **ระบบกิจกรรม**  (Activities)',
-    '˙ ╰ ┈ ‧₊˚ จัดการรายชื่อกิจกรรม กำหนดคะแนน และดูประวัติการลงทะเบียน',
-    '╭ ꔫ ﹒ 📅 **ระบบเช็คชื่อ**  (Check-in)',
-    '˙ ╰ ┈ ‧₊˚ สร้างหัวข้อเช็คชื่อ เปิด-ปิดรอบ และดูรายชื่อผู้ลงชื่อ',
-    '╭ ꔫ ﹒ 👮 **สิทธิ์การใช้งาน**  (Roles)',
-    '˙ ╰ ┈ ‧₊˚ กำหนด Role Admin / Helper / Member สำหรับจำกัดสิทธิ์การใช้งาน',
-    '╭ ꔫ ﹒ ⚙️ **ตั้งค่าอื่นๆ**  (Settings)',
-    '˙ ╰ ┈ ‧₊˚ ตั้งเวลาปิดรับการลา แก้ไขคะแนน ดูประวัติย้อนหลัง และอื่นๆ',
-    '☁️ ⁺ ˖ ⸝⸝ Enjoy Managing  !   ‧   Baby Grape System   🍇   ⋆ ♡ ˊ ˎ -',
-  ].join('\n');
-
-  const embed = new EmbedBuilder().setColor(0x7c3aed).setDescription(description);
+  // รูปแบบตรงกับ Baby Grape ต้นฉบับ
+  const embed = new EmbedBuilder()
+    .setColor(0x9b59b6)
+    .setTitle('⸝ Baby Grape Control Panel 𓂃 ✿')
+    .setDescription(
+      [
+        '﹒ 🍇﹕ ✼ ﹒ **Admin Zone !**   ♡   ยินดีต้อนรับสู่หลังบ้านของ Baby Grape นะคะ   ⋆   ⁺',
+        '☁️ ﹒ กรุณาเลือกเมนูที่ต้องการตั้งค่าด้านล่าง',
+        '',
+        '╭ ꔫ ﹒ 📍 **ระบบห้อง**  (Channels)',
+        '˙ ╰ ┈ ‧₊˚ ตั้งค่าห้องวางปุ่มและ Panel (แจ้งลา / กิจกรรม / เช็คชื่อ / Leaderboard / Log)',
+        '╭ ꔫ ﹒ 🎮 **ระบบกิจกรรม**  (Activities)',
+        '˙ ╰ ┈ ‧₊˚ จัดการรายชื่อกิจกรรม กำหนดคะแนน และดูประวัติการลงทะเบียน',
+        '╭ ꔫ ﹒ 📅 **ระบบเช็คชื่อ**  (Check-in)',
+        '˙ ╰ ┈ ‧₊˚ สร้างหัวข้อเช็คชื่อ เปิด-ปิดรอบ และดูรายชื่อผู้ลงชื่อ',
+        '╭ ꔫ ﹒ 👮 **สิทธิ์การใช้งาน**  (Roles)',
+        '˙ ╰ ┈ ‧₊˚ กำหนด Role Admin / Helper / Member สำหรับจำกัดสิทธิ์การใช้งาน',
+        '╭ ꔫ ﹒ ⚙️ **ตั้งค่าอื่นๆ**  (Settings)',
+        '˙ ╰ ┈ ‧₊˚ ตั้งเวลาปิดรับการลา แก้ไขคะแนน ดูประวัติย้อนหลัง และอื่นๆ',
+        '☁️ ⁺ ˖ ⸝⸝ Enjoy Managing  !   ‧   Baby Grape System   🍇   ⋆ ♡ ˊ ˎ -',
+      ].join('\n'),
+    );
 
   const rows = [
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('admin_channel_settings').setLabel('ตั้งค่าห้อง').setStyle(ButtonStyle.Secondary).setEmoji('📌'),
-      new ButtonBuilder().setCustomId('admin_activities').setLabel('กิจกรรม').setStyle(ButtonStyle.Secondary).setEmoji('🎮'),
-      new ButtonBuilder().setCustomId('admin_checkin').setLabel('เช็คชื่อ').setStyle(ButtonStyle.Secondary).setEmoji('📅'),
+      new ButtonBuilder()
+        .setCustomId('admin_channel_settings')
+        .setLabel('ตั้งค่าห้อง')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('📍'),
+      new ButtonBuilder()
+        .setCustomId('admin_activities')
+        .setLabel('กิจกรรม')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('🎮'),
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('admin_roles').setLabel('ตั้งค่ายศ').setStyle(ButtonStyle.Secondary).setEmoji('👮'),
+      new ButtonBuilder()
+        .setCustomId('admin_checkin')
+        .setLabel('เช็คชื่อ')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('📅'),
+      new ButtonBuilder()
+        .setCustomId('admin_roles')
+        .setLabel('ตั้งค่ายศ')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('👮'),
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('admin_extra').setLabel('ตั้งค่าเพิ่มเติม').setStyle(ButtonStyle.Secondary).setEmoji('⚙️'),
-      new ButtonBuilder().setCustomId('admin_delivery').setLabel('ระบบส่งของ').setStyle(ButtonStyle.Secondary).setEmoji('📦'),
+      new ButtonBuilder()
+        .setCustomId('admin_extra')
+        .setLabel('ตั้งค่าเพิ่มเติม')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('⚙️'),
+      new ButtonBuilder()
+        .setCustomId('admin_delivery')
+        .setLabel('ระบบส่งของ')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('📦'),
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('admin_storage').setLabel('คลังแก๊ง').setStyle(ButtonStyle.Secondary).setEmoji('🏭'),
+      new ButtonBuilder()
+        .setCustomId('admin_storage')
+        .setLabel('คลังแก๊ง')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('🏭'),
     ),
   ];
   return { embeds: [embed], components: rows };
@@ -161,41 +189,40 @@ function weeklyResetButton() {
 
 async function sendAllPanels(guild, channels) {
   const results = [];
-
   async function post(ch, payload, label) {
     if (!ch) {
-      results.push(`ข้าม ${label}: ไม่มีห้อง`);
+      results.push(`ข้าม ${label} (ไม่มีห้อง)`);
       return;
     }
     try {
       await ch.send(payload);
-      results.push(`ส่งแผง ${label} → #${ch.name}`);
+      results.push(`ส่ง${label} → #${ch.name}`);
     } catch (e) {
       results.push(`ล้มเหลว ${label}: ${e.message}`);
     }
   }
 
-  await post(channels.control, activityPanel(), 'ลงทะเบียนกิจกรรม');
-  await post(channels.leave, leavePanel(), 'แจ้งลา');
-  await post(channels.checkin, checkinPanel(), 'เช็คชื่อ');
-  await post(channels.storage, storagePanelLive(), 'คลังของแก๊ง');
-  await post(channels.delivery, deliveryPanel(), 'ส่งของ');
+  await post(channels.control, activityPanel(), 'แผง ลงทะเบียนกิจกรรม');
+  await post(channels.leave, leavePanel(), 'แผง แจ้งลา');
+  await post(channels.checkin, checkinPanel(), 'แผง เช็คชื่อ');
+  await post(channels.storage, storagePanel(), 'แผง คลังของแก๊ง');
+  await post(channels.delivery, deliveryPanel(), 'แผง ส่งของ');
 
   if (channels.score) {
     try {
-      await channels.score.send({ embeds: [scoreboardPlaceholder('weekly')] });
       await channels.score.send({
-        embeds: [scoreboardPlaceholder('monthly')],
+        embeds: [scoreboardPlaceholder('weekly'), scoreboardPlaceholder('monthly')],
         components: [weeklyResetButton()],
       });
       results.push(`ส่งกระดานคะแนน → #${channels.score.name}`);
     } catch (e) {
-      results.push(`ล้มเหลว ตารางคะแนน: ${e.message}`);
+      results.push(`ล้มเหลว คะแนน: ${e.message}`);
     }
   }
 
+  // แผงแอดมิน → ห้อง log (ไม่ใช้ heist-score)
   const adminCh = channels.admin || channels.log || channels.control;
-  await post(adminCh, adminPanel(), 'แผงจัดการ (heist-score)');
+  await post(adminCh, adminPanel(), 'แผงแอดมิน Control Panel');
 
   return results;
 }
@@ -205,8 +232,8 @@ module.exports = {
   leavePanel,
   checkinPanel,
   storagePanel,
-  storagePanelLive,
-  deliveryPanel,
   adminPanel,
   sendAllPanels,
+  scoreboardPlaceholder,
+  weeklyResetButton,
 };
