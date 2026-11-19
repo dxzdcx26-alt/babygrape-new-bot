@@ -7,7 +7,7 @@ const {
   PermissionsBitField,
 } = require('discord.js');
 const { setSetting } = require('../database');
-const { sendAllPanels } = require('../panels/systemPanels');
+const { sendAllPanels, adminPanel } = require('../panels/systemPanels');
 const { sendRosterPanel } = require('../panels/rosterPanel');
 const { isAdmin } = require('../utils/permissions');
 const config = require('../config');
@@ -366,7 +366,7 @@ module.exports = {
         delivery: deliveryCh,
         score: null,
         log,
-        admin: log,
+        admin: null,
       });
 
       try {
@@ -384,7 +384,7 @@ module.exports = {
         .map((r) => `${r}`)
         .join(' · ');
 
-      const embed = new EmbedBuilder()
+      const summary = new EmbedBuilder()
         .setColor(0x8b5cf6)
         .setTitle('✨ Setup เสร็จ')
         .setDescription(
@@ -393,22 +393,26 @@ module.exports = {
             reused.length ? `**ใช้ของเดิม**\n${reused.map((x) => `• ${x}`).join('\n')}` : null,
             roleLine ? `₊˚ ยศ: ${roleLine}` : null,
             '₊˚ **ไม่สร้าง** ตารางคะแนน / ตัดยอด / คลัง / heist-score',
-            '₊˚ แผงแอดมิน **Control Panel** อยู่ที่ประวัติ-log',
             '₊˚ หมวดเห็นเฉพาะยศ BG',
+            '₊˚ แผงห้องถูกส่งแล้ว · **Control Panel ด้านล่าง** (ตอบจากคำสั่ง ไม่โพสต์ log)',
           ]
             .filter(Boolean)
             .join('\n'),
         )
         .addFields(
           {
-            name: '‧ แผง',
-            value: (panelResults || []).slice(0, 12).map((x) => `• ${x}`).join('\n') || '—',
+            name: '‧ แผงที่ส่งในห้อง',
+            value: (panelResults || []).slice(0, 10).map((x) => `• ${x}`).join('\n') || '—',
           },
-          { name: '‧ IDs', value: '```env\n' + envBlock.slice(0, 900) + '\n```' },
+          { name: '‧ IDs', value: '```env\n' + envBlock.slice(0, 800) + '\n```' },
         )
         .setTimestamp();
 
-      await interaction.editReply({ embeds: [embed] });
+      const controlPanelPayload = adminPanel();
+      await interaction.editReply({
+        embeds: [summary, ...controlPanelPayload.embeds],
+        components: controlPanelPayload.components,
+      });
     } catch (err) {
       console.error('/setup failed:', err);
       await interaction.editReply({ content: `❌ ${err.message}\n` + INVITE_URL });
