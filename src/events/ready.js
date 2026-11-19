@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const config = require('../config');
 const { updateScoreboard } = require('../services/scoreboard');
 const { archiveAndCreateNewChannel } = require('../services/archive');
-const { runMigrations } = require('../database');
+const { runMigrations, getSetting } = require('../database');
 
 module.exports = {
   name: 'ready',
@@ -19,11 +19,13 @@ module.exports = {
     }
 
     runMigrations();
+    config.hydrateFromDatabase(getSetting);
 
     cron.schedule(
       config.archiveCron,
       () => {
         if (!config.channels?.target || !config.channels?.archiveCategory) {
+          console.log('ข้าม archive: ยังไม่มี TARGET / ARCHIVE category');
           return;
         }
         archiveAndCreateNewChannel(client);
