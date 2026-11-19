@@ -24,17 +24,25 @@ const client = new Client({
 
 client.commands = new Collection();
 
+// อนุญาตเฉพาะ /setup — ฟีเจอร์อื่นใช้ปุ่มในแผง
 const commandsPath = path.join(__dirname, 'commands');
+const allowedCommands = new Set(['setup']);
 for (const file of fs.readdirSync(commandsPath).filter((f) => f.endsWith('.js'))) {
   const command = require(path.join(commandsPath, file));
-  if (command.data?.name) {
+  if (command.data?.name && allowedCommands.has(command.data.name)) {
     client.commands.set(command.data.name, command);
     console.log(`  ✓ Command loaded: /${command.data.name}`);
   }
 }
+console.log('  (slash อื่นปิดแล้ว — ใช้แผงปุ่มแทน)');
 
 const eventsPath = path.join(__dirname, 'events');
 for (const file of fs.readdirSync(eventsPath).filter((f) => f.endsWith('.js'))) {
+  // ปิด prefix commands (!help !reset) — ใช้เฉพาะ interaction ปุ่ม
+  if (file === 'messageCreate.js' && process.env.ENABLE_PREFIX !== '1') {
+    console.log('  ⊘ Event skipped: messageCreate (prefix ปิด)');
+    continue;
+  }
   const event = require(path.join(eventsPath, file));
   if (event.once) client.once(event.name, (...args) => event.execute(...args));
   else client.on(event.name, (...args) => event.execute(...args));
