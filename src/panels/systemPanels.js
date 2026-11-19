@@ -149,11 +149,8 @@ function adminPanel() {
   return { embeds: [embed], components: rows };
 }
 
-function scoreboardPlaceholder(type) {
-  return new EmbedBuilder()
-    .setColor(0x8b5cf6)
-    .setTitle('ตารางคะแนน')
-    .setDescription('ปิดการสร้างอัตโนมัติ');
+function scoreboardPlaceholder() {
+  return new EmbedBuilder().setColor(0x8b5cf6).setTitle('ตารางคะแนน').setDescription('ปิด');
 }
 
 function weeklyResetButton() {
@@ -186,10 +183,9 @@ async function sendAllPanels(guild, channels) {
   await post(channels.checkin, checkinPanel(), 'แผง เช็คชื่อ');
   await post(channels.delivery, deliveryPanel(), 'แผง ส่งของ');
 
-  // ไม่สร้างตารางคะแนน — แผงแอดมินที่ log
-  const adminCh = channels.admin || channels.log || null;
-  if (adminCh) {
-    await post(adminCh, adminPanel(), 'แผงแอดมิน Control Panel');
+  // แผงแอดมินไม่โพสต์ห้อง — ตอบจาก /setup เท่านั้น
+  if (channels.admin) {
+    await post(channels.admin, adminPanel(), 'แผงแอดมิน Control Panel');
   }
 
   return results;
