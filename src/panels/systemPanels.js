@@ -86,7 +86,6 @@ function storagePanel() {
 }
 
 function adminPanel() {
-  // รูปแบบตรงกับ Baby Grape ต้นฉบับ
   const embed = new EmbedBuilder()
     .setColor(0x9b59b6)
     .setTitle('⸝ Baby Grape Control Panel 𓂃 ✿')
@@ -146,13 +145,6 @@ function adminPanel() {
         .setStyle(ButtonStyle.Danger)
         .setEmoji('📦'),
     ),
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('admin_storage')
-        .setLabel('คลังแก๊ง')
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('🏭'),
-    ),
   ];
   return { embeds: [embed], components: rows };
 }
@@ -205,7 +197,7 @@ async function sendAllPanels(guild, channels) {
   await post(channels.control, activityPanel(), 'แผง ลงทะเบียนกิจกรรม');
   await post(channels.leave, leavePanel(), 'แผง แจ้งลา');
   await post(channels.checkin, checkinPanel(), 'แผง เช็คชื่อ');
-  await post(channels.storage, storagePanel(), 'แผง คลังของแก๊ง');
+  // ไม่ส่งแผงคลัง — ห้องถูกนำออกแล้ว
   await post(channels.delivery, deliveryPanel(), 'แผง ส่งของ');
 
   if (channels.score) {
@@ -220,7 +212,6 @@ async function sendAllPanels(guild, channels) {
     }
   }
 
-  // แผงแอดมิน → ห้อง log (ไม่ใช้ heist-score)
   const adminCh = channels.admin || channels.log || channels.control;
   await post(adminCh, adminPanel(), 'แผงแอดมิน Control Panel');
 
