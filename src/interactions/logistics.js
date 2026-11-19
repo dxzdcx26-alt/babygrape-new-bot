@@ -105,7 +105,7 @@ function formatRecentDeliveries(limit = 5) {
     return rows
       .map((r, i) => {
         const when = r.created_at || '';
-        return `**${i + 1}.** ${r.item_name} × ${r.quantity} → ${r.destination}\n โดย <@${r.user_id}> · ${when}`;
+        return `**${i + 1}.** ${r.item_name} × ${r.quantity}\n โดย <@${r.user_id}> · ${when}`;
       })
       .join('\n');
   } catch {
@@ -123,8 +123,8 @@ function deliveryPanel() {
         '',
         '**วิธีใช้**',
         '1. กดปุ่มด้านล่าง',
-        '2. กรอก **ชนิดของ** / **จำนวน** / **จุดส่ง/ผู้รับ**',
-        '3. **ส่งรูป snap** ในห้องนี้ภายใน 60 วินาที',
+        '2. กรอก **ชนิดของ** / **จำนวน**',
+        '3. **อัปโหลดรูป snap** เป็นหลักฐาน (ภายใน 60 วินาที)',
         '4. ระบบบันทึกเข้า **ประวัติ-log**',
         '',
         '**รายการล่าสุด**',
@@ -235,14 +235,6 @@ async function handleLogistics(interaction) {
               .setRequired(true)
               .setValue('1'),
           ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId('destination')
-              .setLabel('จุดส่ง / ผู้รับ')
-              .setStyle(TextInputStyle.Short)
-              .setRequired(true)
-              .setPlaceholder('เช่น โกดัง A / @ชื่อคนรับ'),
-          ),
         );
         return interaction.showModal(modal);
       }
@@ -320,24 +312,17 @@ async function handleLogistics(interaction) {
     if (interaction.isModalSubmit() && id === 'delivery_submit_modal') {
       const item = interaction.fields.getTextInputValue('item_name').trim();
       const qty = parseInt(interaction.fields.getTextInputValue('quantity'), 10) || 1;
-      const dest = interaction.fields.getTextInputValue('destination').trim();
+      const dest = '-';
       const userId = interaction.user.id;
       const channelId = interaction.channelId;
-
-      if (!dest) {
-        return interaction.reply({
-          content: 'กรุณากรอก **จุดส่ง / ผู้รับ**',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
 
       pendingDeliveryProof.set(userId, { item, qty, dest, channelId, at: Date.now() });
 
       await interaction.reply({
         content:
-          `📦 ข้อมูล: **${item}** × **${qty}** → **${dest}**\n\n` +
-          `ต่อไป **อัปโหลดรูป snap** ในห้องนี้ภายใน **60 วินาที**\n` +
-          `(แนบรูปอย่างเดียวก็ได้)`,
+          `📦 ข้อมูล: **${item}** × **${qty}**\n\n` +
+          `ต่อไป **อัปโหลดรูป snap / แคปหน้าจอ** ในห้องนี้ภายใน **60 วินาที**\n` +
+          `(แนบรูปอย่างเดียว — ไม่ต้องพิมพ์ข้อความ)`,
         flags: MessageFlags.Ephemeral,
       });
 
@@ -351,11 +336,10 @@ async function handleLogistics(interaction) {
           const embed = new EmbedBuilder()
             .setColor(0x22c55e)
             .setTitle('📦 บันทึกส่งของแล้ว')
-            .setDescription('จากห้องส่งของ · หลักฐานจากรูป snap')
+            .setDescription('หลักฐานจากรูป snap')
             .addFields(
               { name: 'ชนิดของ', value: item, inline: true },
               { name: 'จำนวน', value: String(qty), inline: true },
-              { name: 'จุดส่ง / ผู้รับ', value: dest, inline: true },
               { name: 'โดย', value: `<@${userId}>`, inline: true },
             )
             .setImage(imageUrl)
