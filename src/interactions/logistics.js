@@ -16,11 +16,11 @@ const {
   createDelivery,
   getRecentDeliveries,
   getSetting,
+  setSetting,
 } = require('../database');
 const { isAdmin } = require('../utils/permissions');
 const config = require('../config');
 
-/** userId → { item, qty, dest, channelId, expires } รออัปโหลดรูป */
 const pendingDeliveryProof = new Map();
 const pendingWithdrawProof = new Map();
 
@@ -49,15 +49,37 @@ function resolveLogChannelId() {
   );
 }
 
-async function postToLog(client, payload) {
-  const logChId = resolveLogChannelId();
-  if (!logChId) {
-    console.warn('ไม่มี LOG_CHANNEL_ID — รัน /setup ก่อน');
-    return false;
+async function findLogChannel(client, guild) {
+  const id = resolveLogChannelId();
+  if (id) {
+    const ch = await client.channels.fetch(id).catch(() => null);
+    if (ch) return ch;
   }
+  if (guild) {
+    await guild.channels.fetch().catch(() => null);
+    const found = guild.channels.cache.find(
+      (c) =>
+        c.isTextBased?.() &&
+        (c.name.includes('ประวัติ') || c.name.includes('log') || c.name.includes('˗log')),
+    );
+    if (found) {
+      process.env.LOG_CHANNEL_ID = found.id;
+      try {
+        setSetting('log_channel_id', found.id);
+      } catch { /* ignore */ }
+      return found;
+    }
+  }
+  return null;
+}
+
+async function postToLog(client, payload, guild = null) {
   try {
-    const ch = await client.channels.fetch(logChId);
-    if (!ch) return false;
+    const ch = await findLogChannel(client, guild);
+    if (!ch) {
+      console.warn('ไม่พบห้องประวัติ-log — รัน /setup');
+      return false;
+    }
     await ch.send(payload);
     return true;
   } catch (e) {
@@ -101,9 +123,9 @@ function deliveryPanel() {
         '',
         '**วิธีใช้**',
         '1. กดปุ่มด้านล่าง',
-        '2. กรอก **ชนิดของ** / **จำนวน** / จุดส่ง',
-        '3. **ส่งรูป snap** ในห้องนี้เป็นหลักฐาน (ภายใน 60 วินาที)',
-        '4. ระบบบันทึกแล้วส่งเข้า **ประวัติ-log**',
+        '2. กรอก **ชนิดของ** / **จำนวน** / **จุดส่ง/ผู้รับ**',
+        '3. **ส่งรูป snap** ในห้องนี้ภายใน 60 วินาที',
+        '4. ระบบบันทึกเข้า **ประวัติ-log**',
         '',
         '**รายการล่าสุด**',
         formatRecentDeliveries(5),
@@ -163,9 +185,10 @@ function startImageCollector(client, userId, channelId, onImage, onTimeout) {
   const filter = (m) =>
     m.author.id === userId &&
     m.attachments.size > 0 &&
-    [...m.attachments.values()].some((a) =>
-      (a.contentType || '').startsWith('image/') ||
-      /\.(png|jpe?g|gif|webp)$/i.test(a.name || a.url),
+    [...m.attachments.values()].some(
+      (a) =>
+        (a.contentType || '').startsWith('image/') ||
+        /\.(png|jpe?g|gif|webp)$/i.test(a.name || a.url),
     );
 
   const collector = channel.createMessageCollector({ filter, max: 1, time: 60_000 });
@@ -217,7 +240,8 @@ async function handleLogistics(interaction) {
               .setCustomId('destination')
               .setLabel('จุดส่ง / ผู้รับ')
               .setStyle(TextInputStyle.Short)
-              .setRequired(true),
+              .setRequired(true)
+              .setPlaceholder('เช่น โกดัง A / @ชื่อคนรับ'),
           ),
         );
         return interaction.showModal(modal);
@@ -287,20 +311,12 @@ async function handleLogistics(interaction) {
         return interaction.showModal(modal);
       }
 
-      if (id.startsWith('delivery_check_')) {
-        return interaction.reply({
-          content: `📦 **ประวัติส่งของล่าสุด**\n\n${formatRecentDeliveries(8)}`,
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
       return interaction.reply({
         content: 'ปุ่มนี้ยังไม่รองรับ — รัน `/setup` ส่งแผงใหม่',
         flags: MessageFlags.Ephemeral,
       });
     }
 
-    // Modal ส่งของ → รอรูป snap
     if (interaction.isModalSubmit() && id === 'delivery_submit_modal') {
       const item = interaction.fields.getTextInputValue('item_name').trim();
       const qty = parseInt(interaction.fields.getTextInputValue('quantity'), 10) || 1;
@@ -308,13 +324,20 @@ async function handleLogistics(interaction) {
       const userId = interaction.user.id;
       const channelId = interaction.channelId;
 
+      if (!dest) {
+        return interaction.reply({
+          content: 'กรุณากรอก **จุดส่ง / ผู้รับ**',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
       pendingDeliveryProof.set(userId, { item, qty, dest, channelId, at: Date.now() });
 
       await interaction.reply({
         content:
-          `📦 กรอกข้อมูลแล้ว: **${item}** × **${qty}** → ${dest}\n\n` +
-          `ต่อไป **อัปโหลดรูป snap / แคปหน้าจอ** ในห้องนี้ภายใน **60 วินาที**\n` +
-          `แนบรูปอย่างเดียวก็ได้ (ไม่ต้องพิมพ์ข้อความ)`,
+          `📦 ข้อมูล: **${item}** × **${qty}** → **${dest}**\n\n` +
+          `ต่อไป **อัปโหลดรูป snap** ในห้องนี้ภายใน **60 วินาที**\n` +
+          `(แนบรูปอย่างเดียวก็ได้)`,
         flags: MessageFlags.Ephemeral,
       });
 
@@ -328,18 +351,18 @@ async function handleLogistics(interaction) {
           const embed = new EmbedBuilder()
             .setColor(0x22c55e)
             .setTitle('📦 บันทึกส่งของแล้ว')
-            .setDescription('บันทึกจากห้องส่งของ · หลักฐานจากรูป snap')
+            .setDescription('จากห้องส่งของ · หลักฐานจากรูป snap')
             .addFields(
               { name: 'ชนิดของ', value: item, inline: true },
               { name: 'จำนวน', value: String(qty), inline: true },
-              { name: 'จุดส่ง', value: dest, inline: true },
+              { name: 'จุดส่ง / ผู้รับ', value: dest, inline: true },
               { name: 'โดย', value: `<@${userId}>`, inline: true },
             )
             .setImage(imageUrl)
             .setFooter({ text: `Delivery #${logId}` })
             .setTimestamp();
 
-          await postToLog(interaction.client, { embeds: [embed] });
+          await postToLog(interaction.client, { embeds: [embed] }, interaction.guild);
           await msg.reply({ embeds: [embed] }).catch(() => {});
           try {
             if (interaction.message?.editable) await interaction.message.edit(deliveryPanel());
@@ -351,9 +374,9 @@ async function handleLogistics(interaction) {
             const ch = await interaction.client.channels.fetch(channelId).catch(() => null);
             if (ch) {
               await ch
-                .send({
-                  content: `<@${userId}> หมดเวลา 60 วินาที — ไม่ได้รับรูปหลักฐาน ส่งของไม่ถูกบันทึก กดปุ่มใหม่แล้วอัปโหลดรูปอีกครั้ง`,
-                })
+                .send(
+                  `<@${userId}> หมดเวลา 60 วินาที — ไม่ได้รับรูปหลักฐาน ส่งของยังไม่ถูกบันทึก`,
+                )
                 .catch(() => {});
             }
           }
@@ -362,7 +385,6 @@ async function handleLogistics(interaction) {
       return;
     }
 
-    // Modal เบิกของ → รอรูป snap
     if (interaction.isModalSubmit() && id === 'storage_withdraw_modal') {
       const item = interaction.fields.getTextInputValue('item_name').trim();
       const qty = Math.abs(parseInt(interaction.fields.getTextInputValue('quantity'), 10) || 1);
@@ -370,24 +392,17 @@ async function handleLogistics(interaction) {
       const found = items.find((i) => i.name.toLowerCase() === item.toLowerCase());
       if (!found || found.quantity < qty) {
         return interaction.reply({
-          content: `❌ ของไม่พอในคลัง (มี ${found ? found.quantity : 0})\nให้แอดมินกด **จัดการคลัง** เพิ่มของก่อน`,
+          content: `❌ ของไม่พอในคลัง (มี ${found ? found.quantity : 0})`,
           flags: MessageFlags.Ephemeral,
         });
       }
 
       const userId = interaction.user.id;
       const channelId = interaction.channelId;
-      pendingWithdrawProof.set(userId, {
-        item: found.name,
-        qty,
-        channelId,
-        stock: found.quantity,
-      });
+      pendingWithdrawProof.set(userId, { item: found.name, qty, channelId });
 
       await interaction.reply({
-        content:
-          `📥 เบิก **${found.name}** × **${qty}**\n\n` +
-          `อัปโหลด**รูป snap หลักฐาน**ในห้องนี้ภายใน **60 วินาที**`,
+        content: `📥 เบิก **${found.name}** × **${qty}**\nอัปโหลด**รูป snap** ภายใน 60 วินาที`,
         flags: MessageFlags.Ephemeral,
       });
 
@@ -402,13 +417,11 @@ async function handleLogistics(interaction) {
           const embed = new EmbedBuilder()
             .setColor(0xf59e0b)
             .setTitle('📥 เบิกของแล้ว')
-            .setDescription(
-              `**${found.name}** × ${qty}\nเหลือในคลัง: **${found.quantity - qty}**`,
-            )
-            .addFields({ name: 'โดย', value: `<@${userId}>`, inline: true })
+            .setDescription(`**${found.name}** × ${qty}\nเหลือ: **${found.quantity - qty}**`)
+            .addFields({ name: 'โดย', value: `<@${userId}>` })
             .setImage(imageUrl)
             .setTimestamp();
-          await postToLog(interaction.client, { embeds: [embed] });
+          await postToLog(interaction.client, { embeds: [embed] }, interaction.guild);
           await msg.reply({ embeds: [embed] }).catch(() => {});
           try {
             if (interaction.message?.editable) await interaction.message.edit(storagePanelLive());
@@ -418,11 +431,7 @@ async function handleLogistics(interaction) {
           if (pendingWithdrawProof.has(userId)) {
             pendingWithdrawProof.delete(userId);
             const ch = await interaction.client.channels.fetch(channelId).catch(() => null);
-            if (ch) {
-              await ch
-                .send(`<@${userId}> หมดเวลา — ไม่ได้รับรูปหลักฐาน การเบิกถูกยกเลิก`)
-                .catch(() => {});
-            }
+            if (ch) await ch.send(`<@${userId}> หมดเวลา — ยกเลิกการเบิก`).catch(() => {});
           }
         },
       );
@@ -442,16 +451,20 @@ async function handleLogistics(interaction) {
         content: `✅ ตั้งคลัง **${item}** = ${qty} แล้ว`,
         flags: MessageFlags.Ephemeral,
       });
-      await postToLog(interaction.client, {
-        embeds: [
-          new EmbedBuilder()
-            .setColor(0x8b5cf6)
-            .setTitle('🛡️ อัปเดตคลัง (Admin)')
-            .setDescription(`**${item}** = ${qty}`)
-            .addFields({ name: 'โดย', value: `<@${interaction.user.id}>` })
-            .setTimestamp(),
-        ],
-      });
+      await postToLog(
+        interaction.client,
+        {
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0x8b5cf6)
+              .setTitle('🛡️ อัปเดตคลัง (Admin)')
+              .setDescription(`**${item}** = ${qty}`)
+              .addFields({ name: 'โดย', value: `<@${interaction.user.id}>` })
+              .setTimestamp(),
+          ],
+        },
+        interaction.guild,
+      );
       try {
         if (interaction.message?.editable) await interaction.message.edit(storagePanelLive());
       } catch { /* ignore */ }
@@ -460,7 +473,7 @@ async function handleLogistics(interaction) {
 
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({
-        content: 'ไม่สามารถประมวลผลได้ — ลองแผงใหม่จาก `/setup`',
+        content: 'ไม่สามารถประมวลผลได้ — ลอง `/setup`',
         flags: MessageFlags.Ephemeral,
       });
     }
