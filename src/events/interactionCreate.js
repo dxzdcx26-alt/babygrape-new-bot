@@ -13,6 +13,10 @@ const {
   isAdminPanelInteraction,
   handleAdminPanel,
 } = require('../interactions/adminPanel');
+const {
+  isLogisticsInteraction,
+  handleLogistics,
+} = require('../interactions/logistics');
 const { handleLeaveModal } = require('../commands/leave');
 const { handleRosterRefresh } = require('../panels/rosterPanel');
 const {
@@ -38,6 +42,11 @@ module.exports = {
 
       if (isAdminPanelInteraction(interaction)) {
         await handleAdminPanel(interaction);
+        return;
+      }
+
+      if (isLogisticsInteraction(interaction)) {
+        await handleLogistics(interaction);
         return;
       }
 
@@ -125,14 +134,6 @@ module.exports = {
           if (cmd) return cmd.execute(interaction);
           return interaction.reply({
             content: 'ไม่พบคำสั่ง weekly_reset',
-            flags: MessageFlags.Ephemeral,
-          });
-        }
-
-        if (id === 'storage_withdraw_btn' || id === 'storage_admin_btn') {
-          return interaction.reply({
-            content:
-              '📦 ระบบคลัง: ใช้เมนู **คลังแก๊ง** ในแผงแอดมิน หรือรออัปเดตรอบถัดไปสำหรับฟอร์มเบิกของเต็มรูปแบบ',
             flags: MessageFlags.Ephemeral,
           });
         }
