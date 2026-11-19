@@ -89,8 +89,64 @@ function adminPanel() {
   const embed = new EmbedBuilder()
     .setColor(0x9b59b6)
     .setTitle('⸝ Baby Grape Control Panel 𓂃 ✿')
-    .setDescription('แผงแอดมินถูกปิดจากการสร้างอัตโนมัติ');
-  return { embeds: [embed], components: [] };
+    .setDescription(
+      [
+        '﹒ 🍇﹕ ✼ ﹒ **Admin Zone !** ♡ ยินดีต้อนรับสู่หลังบ้านของ Baby Grape นะคะ ⋆ ⁺',
+        '☁️ ﹒ กรุณาเลือกเมนูที่ต้องการตั้งค่าด้านล่าง',
+        '',
+        '╭ ꔫ ﹒ 📍 **ระบบห้อง** (Channels)',
+        '˙ ╰ ┈ ‧₊˚ ตั้งค่าห้องวางปุ่มและ Panel (แจ้งลา / กิจกรรม / เช็คชื่อ / Leaderboard / Log)',
+        '╭ ꔫ ﹒ 🎮 **ระบบกิจกรรม** (Activities)',
+        '˙ ╰ ┈ ‧₊˚ จัดการรายชื่อกิจกรรม กำหนดคะแนน และดูประวัติการลงทะเบียน',
+        '╭ ꔫ ﹒ 📅 **ระบบเช็คชื่อ** (Check-in)',
+        '˙ ╰ ┈ ‧₊˚ สร้างหัวข้อเช็คชื่อ เปิด-ปิดรอบ และดูรายชื่อผู้ลงชื่อ',
+        '╭ ꔫ ﹒ 👮 **สิทธิ์การใช้งาน** (Roles)',
+        '˙ ╰ ┈ ‧₊˚ กำหนด Role Admin / Helper / Member สำหรับจำกัดสิทธิ์การใช้งาน',
+        '╭ ꔫ ﹒ ⚙️ **ตั้งค่าอื่นๆ** (Settings)',
+        '˙ ╰ ┈ ‧₊˚ ตั้งเวลาปิดรับการลา แก้ไขคะแนน ดูประวัติย้อนหลัง และอื่นๆ',
+        '☁️ ⁺ ˖ ⸝⸝ Enjoy Managing ! ‧ Baby Grape System 🍇 ⋆ ♡ ˊ ˎ -',
+      ].join('\n'),
+    );
+
+  const rows = [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('admin_channel_settings')
+        .setLabel('ตั้งค่าห้อง')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('📍'),
+      new ButtonBuilder()
+        .setCustomId('admin_activities')
+        .setLabel('กิจกรรม')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('🎮'),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('admin_checkin')
+        .setLabel('เช็คชื่อ')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('📅'),
+      new ButtonBuilder()
+        .setCustomId('admin_roles')
+        .setLabel('ตั้งค่ายศ')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('👮'),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('admin_extra')
+        .setLabel('ตั้งค่าเพิ่มเติม')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('⚙️'),
+      new ButtonBuilder()
+        .setCustomId('admin_delivery')
+        .setLabel('ระบบส่งของ')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('📦'),
+    ),
+  ];
+  return { embeds: [embed], components: rows };
 }
 
 function scoreboardPlaceholder(type) {
@@ -130,7 +186,11 @@ async function sendAllPanels(guild, channels) {
   await post(channels.checkin, checkinPanel(), 'แผง เช็คชื่อ');
   await post(channels.delivery, deliveryPanel(), 'แผง ส่งของ');
 
-  // ไม่สร้างตารางคะแนน / ไม่ส่งแผงแอดมิน
+  // ไม่สร้างตารางคะแนน — แผงแอดมินที่ log
+  const adminCh = channels.admin || channels.log || null;
+  if (adminCh) {
+    await post(adminCh, adminPanel(), 'แผงแอดมิน Control Panel');
+  }
 
   return results;
 }
