@@ -1,21 +1,14 @@
-/**
- * BabyGrape New Bot v2.0
- * Application ID: 1572394577724317788
- */
-
-const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
+const {
+  Client,
+  GatewayIntentBits,
+  Collection,
+  Partials,
+} = require('discord.js');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const config = require('./config');
-const { runMigrations } = require('./database');
 
-runMigrations();
-
-// ไม่ใช้ privileged intents โดย default (กัน Used disallowed intents)
-// เปิดใน Discord Developer Portal แล้วค่อยใส่ env:
-//   ENABLE_MESSAGE_CONTENT=1  → คำสั่ง !prefix
-//   ENABLE_GUILD_MEMBERS=1    → ดึงสมาชิกครบ
 const intents = [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages];
 if (process.env.ENABLE_MESSAGE_CONTENT === '1') {
   intents.push(GatewayIntentBits.MessageContent);
@@ -26,7 +19,7 @@ if (process.env.ENABLE_GUILD_MEMBERS === '1') {
 
 const client = new Client({
   intents,
-  partials: [Partials.Channel],
+  partials: [Partials.Channel, Partials.Message],
 });
 
 client.commands = new Collection();
@@ -34,7 +27,7 @@ client.commands = new Collection();
 const commandsPath = path.join(__dirname, 'commands');
 for (const file of fs.readdirSync(commandsPath).filter((f) => f.endsWith('.js'))) {
   const command = require(path.join(commandsPath, file));
-  if (command.data && command.execute) {
+  if (command.data?.name) {
     client.commands.set(command.data.name, command);
     console.log(`  ✓ Command loaded: /${command.data.name}`);
   }
@@ -62,7 +55,9 @@ app.listen(port, () => {
 client.login(config.token).catch((err) => {
   console.error('❌ Login failed:', err.message);
   if (String(err.message).includes('disallowed intents')) {
-    console.error('→ ปิด ENABLE_MESSAGE_CONTENT / ENABLE_GUILD_MEMBERS หรือเปิด Intents ใน Developer Portal');
+    console.error(
+      '→ ปิด ENABLE_MESSAGE_CONTENT / ENABLE_GUILD_MEMBERS หรือเปิด Intents ใน Developer Portal',
+    );
   }
   process.exit(1);
 });
@@ -70,4 +65,11 @@ client.login(config.token).catch((err) => {
 process.on('SIGINT', () => {
   client.destroy();
   process.exit(0);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('unhandledRejection:', err?.message || err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('uncaughtException:', err?.message || err);
 });
