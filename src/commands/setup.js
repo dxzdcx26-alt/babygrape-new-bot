@@ -4,6 +4,7 @@ const {
   PermissionFlagsBits,
   EmbedBuilder,
   Colors,
+  PermissionsBitField,
 } = require('discord.js');
 const { setSetting } = require('../database');
 const { sendAllPanels } = require('../panels/systemPanels');
@@ -77,6 +78,42 @@ const CHANNELS = {
 const CATEGORY_SYSTEM = '🍇 ‧ BABY GRAPE SYSTEM';
 const CATEGORY_ARCHIVE = '🗄️ ‧ heist˗archive';
 
+/** สิทธิ์ยศที่ setup จะตั้งให้ */
+const ROLE_PERMS = {
+  admin: new PermissionsBitField([
+    PermissionFlagsBits.Administrator,
+  ]),
+  helper: new PermissionsBitField([
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks,
+    PermissionFlagsBits.AttachFiles,
+    PermissionFlagsBits.ReadMessageHistory,
+    PermissionFlagsBits.AddReactions,
+    PermissionFlagsBits.UseExternalEmojis,
+    PermissionFlagsBits.ManageMessages,
+    PermissionFlagsBits.ModerateMembers,
+    PermissionFlagsBits.KickMembers,
+    PermissionFlagsBits.ManageNicknames,
+    PermissionFlagsBits.MuteMembers,
+    PermissionFlagsBits.MoveMembers,
+    PermissionFlagsBits.Connect,
+    PermissionFlagsBits.Speak,
+  ]),
+  member: new PermissionsBitField([
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks,
+    PermissionFlagsBits.AttachFiles,
+    PermissionFlagsBits.ReadMessageHistory,
+    PermissionFlagsBits.AddReactions,
+    PermissionFlagsBits.UseExternalEmojis,
+    PermissionFlagsBits.UseApplicationCommands,
+    PermissionFlagsBits.Connect,
+    PermissionFlagsBits.Speak,
+  ]),
+};
+
 const ROLES = [
   {
     key: 'admin',
@@ -84,6 +121,7 @@ const ROLES = [
     aliases: ['BG Admin', 'Baby Grape Admin'],
     color: Colors.Purple,
     hoist: true,
+    permissions: ROLE_PERMS.admin,
   },
   {
     key: 'helper',
@@ -91,6 +129,7 @@ const ROLES = [
     aliases: ['BG Helper', 'Helper'],
     color: Colors.Blue,
     hoist: true,
+    permissions: ROLE_PERMS.helper,
   },
   {
     key: 'member',
@@ -98,13 +137,14 @@ const ROLES = [
     aliases: ['BG Member', 'Member'],
     color: Colors.Green,
     hoist: false,
+    permissions: ROLE_PERMS.member,
   },
 ];
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setup')
-    .setDescription('สร้างห้อง + ยศ + แผงปุ่ม Baby Grape System (แอดมิน)')
+    .setDescription('สร้างห้อง + ยศ + สิทธิ์ + แผงปุ่ม Baby Grape System')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addBooleanOption((opt) =>
       opt.setName('force').setDescription('สร้างใหม่แม้มีชื่อซ้ำแล้ว').setRequired(false),
@@ -134,8 +174,8 @@ module.exports = {
     if (!guild) {
       return interaction.editReply({
         content:
-          'ใช้คำสั่งนี้ใน**ห้องของเซิร์ฟเวอร์**เท่านั้น (ไม่ใช่แชทส่วนตัว)\n' +
-          'ถ้าอยู่บนเซิร์ฟอยู่แล้ว: เชิญบอทเข้าเซิร์ฟอีกครั้ง แล้วเปิดสิทธิ์ **Manage Channels** + **Manage Roles**',
+          'ใช้คำสั่งนี้ใน**ห้องของเซิร์ฟเวอร์**เท่านั้น\n' +
+          'เชิญบอทด้วยสิทธิ์ Administrator แล้วลองใหม่',
       });
     }
 
@@ -144,7 +184,7 @@ module.exports = {
       return interaction.editReply({
         content:
           '❌ บอทยังไม่มีสิทธิ์ **Manage Channels**\n' +
-          'ไปที่ Server Settings → Roles → ยศของบอท → เปิด Manage Channels แล้วลอง `/setup` อีกครั้ง',
+          'เชิญบอทใหม่ด้วยลิงก์ที่มี Administrator แล้วลอง `/setup` อีกครั้ง',
       });
     }
 
@@ -234,7 +274,7 @@ module.exports = {
     }
 
     async function findOrCreateRole(def) {
-      const { name, aliases = [], color, hoist } = def;
+      const { name, aliases = [], color, hoist, permissions } = def;
       let role = guild.roles.cache.find(
         (r) =>
           !r.managed &&
@@ -249,6 +289,14 @@ module.exports = {
             console.warn('rename role failed', e.message);
           }
         }
+        // อัปเดตสิทธิ์ทุกครั้งที่ setup
+        if (role.editable && permissions) {
+          try {
+            await role.setPermissions(permissions, 'BabyGrape role permissions');
+          } catch (e) {
+            console.warn('setPermissions failed', role.name, e.message);
+          }
+        }
         reused.push(`@${role.name}`);
         return role;
       }
@@ -257,6 +305,7 @@ module.exports = {
         color,
         hoist: !!hoist,
         mentionable: false,
+        permissions: permissions || 0n,
         reason: 'BabyGrape /setup',
       });
       created.push(`@${name}`);
@@ -267,7 +316,6 @@ module.exports = {
       await guild.channels.fetch().catch(() => null);
       await guild.roles.fetch().catch(() => null);
 
-      // --- Roles ---
       let adminRole = null;
       let helperRole = null;
       let memberRole = null;
@@ -284,7 +332,6 @@ module.exports = {
         }
       }
 
-      // --- Channels ---
       const archiveCat = await findOrCreateCategory(CATEGORY_ARCHIVE, [
         'heist-archive',
         'heist˗archive',
@@ -307,6 +354,98 @@ module.exports = {
       const log = await findOrCreateText(CHANNELS.log, systemCat);
       const adminCh = await findOrCreateText(CHANNELS.admin, systemCat);
       const target = await findOrCreateText(CHANNELS.chat, systemCat);
+
+      // จำกัดห้องแอดมิน: เห็นได้เฉพาะ Admin / Helper + บอท
+      if (adminCh && adminRole) {
+        try {
+          await adminCh.permissionOverwrites.set([
+            {
+              id: guild.id,
+              deny: [PermissionFlagsBits.ViewChannel],
+            },
+            {
+              id: adminRole.id,
+              allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.ReadMessageHistory,
+              ],
+            },
+            ...(helperRole
+              ? [
+                  {
+                    id: helperRole.id,
+                    allow: [
+                      PermissionFlagsBits.ViewChannel,
+                      PermissionFlagsBits.SendMessages,
+                      PermissionFlagsBits.ReadMessageHistory,
+                    ],
+                  },
+                ]
+              : []),
+            ...(me
+              ? [
+                  {
+                    id: me.id,
+                    allow: [
+                      PermissionFlagsBits.ViewChannel,
+                      PermissionFlagsBits.SendMessages,
+                      PermissionFlagsBits.ManageMessages,
+                      PermissionFlagsBits.EmbedLinks,
+                    ],
+                  },
+                ]
+              : []),
+          ]);
+          created.push('สิทธิ์ห้อง heist-score (Admin only)');
+        } catch (e) {
+          console.warn('admin channel overwrite failed', e.message);
+        }
+      }
+
+      // ห้อง log: แอดมิน/helper เห็น, สมาชิกทั่วไปปิด
+      if (log && adminRole) {
+        try {
+          await log.permissionOverwrites.set([
+            {
+              id: guild.id,
+              deny: [PermissionFlagsBits.ViewChannel],
+            },
+            {
+              id: adminRole.id,
+              allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.ReadMessageHistory,
+              ],
+            },
+            ...(helperRole
+              ? [
+                  {
+                    id: helperRole.id,
+                    allow: [
+                      PermissionFlagsBits.ViewChannel,
+                      PermissionFlagsBits.ReadMessageHistory,
+                    ],
+                  },
+                ]
+              : []),
+            ...(me
+              ? [
+                  {
+                    id: me.id,
+                    allow: [
+                      PermissionFlagsBits.ViewChannel,
+                      PermissionFlagsBits.SendMessages,
+                      PermissionFlagsBits.EmbedLinks,
+                    ],
+                  },
+                ]
+              : []),
+          ]);
+        } catch (e) {
+          console.warn('log overwrite failed', e.message);
+        }
+      }
 
       const mapping = {
         GUILD_ID: guild.id,
@@ -363,18 +502,20 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setColor(0x8b5cf6)
-        .setTitle('✨ Setup เสร็จ — ห้อง + ยศ + แผงพร้อมแล้ว')
+        .setTitle('✨ Setup เสร็จ — ห้อง + ยศ + สิทธิ์พร้อมแล้ว')
         .setDescription(
           [
-            created.length ? `**สร้างใหม่**\n${created.map((x) => `✦ ${x}`).join('\n')}` : null,
+            created.length ? `**สร้าง/ตั้งค่า**\n${created.map((x) => `✦ ${x}`).join('\n')}` : null,
             renamed.length ? `**เปลี่ยนชื่อ**\n${renamed.map((x) => `✧ ${x}`).join('\n')}` : null,
             reused.length && !renamed.length
               ? `**ใช้ของเดิม**\n${reused.map((x) => `• ${x}`).join('\n')}`
               : null,
             '',
-            roleLine ? `₊˚ ยศระบบ: ${roleLine}` : null,
-            '₊˚ แผงจัดการอยู่ที่ **🎛️ ‧ heist˗score** ‧₊˚',
-            '₊˚ รายชื่อสมาชิกอยู่ที่ **👥 ‧ รายชื่อ** ‧₊˚',
+            roleLine ? `₊˚ ยศ: ${roleLine}` : null,
+            '₊˚ **BG Admin** = Administrator',
+            '₊˚ **BG Helper** = จัดการข้อความ / ตี / mute',
+            '₊˚ **BG Member** = คุย + ใช้ปุ่มระบบ',
+            '₊˚ ห้อง heist-score / log เห็นเฉพาะ Admin·Helper',
           ]
             .filter(Boolean)
             .join('\n'),
