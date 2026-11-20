@@ -33,14 +33,17 @@ function fetchText(url) {
 
 function patchSource(src) {
   let out = src;
+
   out = out.replace(
     "const token = process.env.token;",
     "const token = process.env.token || process.env.DISCORD_TOKEN;",
   );
   out = out.replace(
     "const guildId = process.env.guildId;",
-    "const guildId = process.env.guildId || process.env.GUILD_ID;",
+    "const guildId = process.env.guildId || process.env.GUILD_ID || '';",
   );
+
+  // แมป env ตัวพิมพ์ใหญ่จากระบบเก่า
   const mapBlock = [
     "// --- mYgang env aliases ---",
     "if (!process.env.controlChannelId && process.env.CONTROL_CHANNEL_ID) process.env.controlChannelId = process.env.CONTROL_CHANNEL_ID;",
@@ -50,14 +53,32 @@ function patchSource(src) {
     "if (!process.env.archiveCategoryId && process.env.ARCHIVE_CATEGORY_ID) process.env.archiveCategoryId = process.env.ARCHIVE_CATEGORY_ID;",
     "if (!process.env.adminRoleId && process.env.ADMIN_ROLE_ID) process.env.adminRoleId = process.env.ADMIN_ROLE_ID;",
     "if (!process.env.mentionRoleId && process.env.MENTION_ROLE_ID) process.env.mentionRoleId = process.env.MENTION_ROLE_ID;",
+    "if (!process.env.googleSheetUrl) process.env.googleSheetUrl = process.env.GOOGLE_SHEET_URL || 'https://example.com';",
+    "if (!process.env.mentionRoleId) process.env.mentionRoleId = '0';",
+    "if (!process.env.adminRoleId) process.env.adminRoleId = '0';",
+    "if (!process.env.controlChannelId) process.env.controlChannelId = '0';",
+    "if (!process.env.logChannelId) process.env.logChannelId = '0';",
+    "if (!process.env.scoreChannelId) process.env.scoreChannelId = '0';",
+    "if (!process.env.targetChannelId) process.env.targetChannelId = '0';",
+    "if (!process.env.archiveCategoryId) process.env.archiveCategoryId = '0';",
+    "if (!process.env.guildId && process.env.GUILD_ID) process.env.guildId = process.env.GUILD_ID;",
+    "if (!process.env.guildId) process.env.guildId = '0';",
     "",
   ].join("\n");
+
   if (!out.includes("mYgang env aliases")) {
     out = out.replace(
       'require("dotenv").config();',
       'require("dotenv").config();\n' + mapBlock,
     );
   }
+
+  // บังคับตรวจแค่ token
+  out = out.replace(
+    /\/\/ --- ตรวจสอบ Secrets ---[\s\S]*?process\.exit\(1\);\s*\}/,
+    `// --- ตรวจสอบ Secrets (mYgang: บังคับแค่ token) ---\nif (!token) {\n    console.error("ไม่มี token / DISCORD_TOKEN");\n    process.exit(1);\n}\nif (!guildId || guildId === '0') {\n    console.warn("ยังไม่มี guildId — ตั้ง GUILD_ID ใน env");\n}`,
+  );
+
   return out;
 }
 
