@@ -1,27 +1,21 @@
 {
   "name": "babygrape-new-bot",
-  "version": "2.0.0",
-  "description": "BabyGrape Discord Bot - Complete Rebuild with Modular Architecture + SQLite",
-  "main": "src/index.js",
+  "version": "1.0.0",
+  "main": "index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "deploy": "node scripts/deploy-commands.js",
-    "db:setup": "node scripts/setup-database.js",
-    "db:migrate": "node scripts/migrate-from-old.js",
-    "panel:send": "node scripts/send-panel.js",
-    "test": "node --test tests/**/*.test.js"
+    "start": "node index.js",
+    "deploy": "node deploy-commands.js"
   },
-  "keywords": ["discord", "bot", "babygrape", "heist", "score"],
-  "author": "BabyGrape Team",
+  "keywords": [],
+  "author": "",
   "license": "ISC",
-  "engines": {
-    "node": ">=22.0.0"
-  },
+  "description": "Baby Grape original bot source for mYgang",
   "dependencies": {
-    "discord.js": "^14.16.3",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "node-cron": "^3.0.3",
-    "axios": "^1.7.9"
+    "axios": "^1.10.0",
+    "csv-writer": "^1.6.0",
+    "discord.js": "^14.21.0",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "node-cron": "^4.2.0"
   }
 }
