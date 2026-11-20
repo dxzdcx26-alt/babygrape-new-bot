@@ -1,30 +1,39 @@
-# Baby Grape Bot (mYgang)
+# Baby Grape (mYgang)
 
-ใช้ซอร์สต้นฉบับ Baby Grape เต็มระบบ
+ใช้**ซอร์สต้นฉบับ**จาก [marshmayris/baby-grape-bot](https://github.com/marshmayris/baby-grape-bot)
 
-## รัน
+โค้ด modular เดิมถูกเลิกใช้แล้ว — ตอนสตาร์ทบอทจะดึง `index.js` ต้นฉบับมาแคชแล้วรัน
 
-```bash
-npm install
-# ตั้งค่า .env หรือ Environment บน Railway
-npm run deploy
-npm start
-```
+## Env
 
-## Env ที่ต้องมี
-
-- `token` หรือ `DISCORD_TOKEN`
-- `clientId` / `CLIENT_ID` = `1572394577724317788`
-- `guildId`
-- `controlChannelId`, `logChannelId`, `scoreChannelId`
-- `targetChannelId`, `archiveCategoryId`
-- `adminRoleId`, `mentionRoleId` (ถ้ามี)
-- `googleSheetUrl` (ถ้าใช้)
+| ชื่อ | ความหมาย |
+|------|----------|
+| `token` หรือ `DISCORD_TOKEN` | Token บอท |
+| `clientId` / `CLIENT_ID` | `1572394577724317788` |
+| `guildId` / `GUILD_ID` | ไอดีเซิร์ฟ |
+| `controlChannelId` | ห้องปุ่มลงทะเบียน |
+| `logChannelId` | ห้อง log |
+| `scoreChannelId` | ห้องตารางคะแนน |
+| `targetChannelId` | ห้อง heist-chat |
+| `archiveCategoryId` | หมวด archive |
+| `adminRoleId` | ยศแอดมิน |
+| `mentionRoleId` | ยศ mention |
+| `googleSheetUrl` | webhook Google Sheets |
 
 ## คำสั่ง
 
-- Slash: `/score`, `/weekly_reset`
-- Prefix: `!help`, `!reset`, และคำสั่งสนุกตามต้นฉบับ
-- ปุ่ม Heist Report ตามแผงใน control channel
+```bash
+npm install
+npm run deploy   # ลงทะเบียน /score /weekly_reset
+npm start
+npm run panel    # ส่งแผงปุ่มลงทะเบียน (ต้องมี controlChannelId)
+```
 
-สคริปต์ `send-panel.js` ใช้ส่งแผงปุ่มลงทะเบียน
+## ฟีเจอร์ต้นฉบับ
+
+- Heist Report แบบ interactive
+- คะแนน weekly / monthly + leaderboard
+- `/score`, `/weekly_reset`
+- Archive ทุก 3 วัน 00:00 Asia/Bangkok
+- `!help`, `!reset`, คำสั่งสนุก
+- Google Sheets + Express port 3000
