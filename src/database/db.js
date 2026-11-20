@@ -1,8 +1,8 @@
 /**
- * SQLite via Node.js built-in module (node:sqlite) — Node 22+
+ * SQLite via better-sqlite3 (compatible with Node 18+)
  * ใช้ DATA_DIR ถ้ามี (Railway Volume แนะนำ mount ที่ /data)
  */
-const { DatabaseSync } = require('node:sqlite');
+const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
@@ -18,8 +18,8 @@ if (!fs.existsSync(dataDir)) {
 const dbPath = path.join(dataDir, 'babygrape.db');
 console.log(`📁 SQLite path: ${dbPath}`);
 
-const db = new DatabaseSync(dbPath);
-db.exec('PRAGMA foreign_keys = ON');
-db.exec('PRAGMA journal_mode = WAL');
+const db = new Database(dbPath);
+db.pragma('foreign_keys = ON');
+db.pragma('journal_mode = WAL');
 
 module.exports = db;
