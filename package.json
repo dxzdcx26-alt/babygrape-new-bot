@@ -1,20 +1,23 @@
 {
   "name": "babygrape-new-bot",
-  "version": "2.0.0",
-  "main": "index.js",
+  "version": "1.5.0",
+  "description": "BabyGrape New Bot - modular mYgang (restored)",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node index.js",
-    "deploy": "node deploy-commands.js",
-    "panel": "node send-panel.js"
+    "start": "node src/index.js",
+    "deploy": "node scripts/deploy-commands.js",
+    "db:setup": "node scripts/db-setup.js",
+    "send": "node scripts/send-panel.js"
   },
-  "description": "Original Baby Grape bot for mYgang (Application 1572394577724317788)",
-  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
-    "axios": "^1.10.0",
-    "csv-writer": "^1.6.0",
-    "discord.js": "^14.21.0",
-    "dotenv": "^17.2.0",
-    "express": "^5.1.0",
-    "node-cron": "^4.2.0"
+    "better-sqlite3": "^11.7.0",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "node-cron": "^3.0.3",
+    "axios": "^1.7.9"
   }
 }
