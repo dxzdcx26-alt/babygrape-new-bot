@@ -1,12 +1,10 @@
 /**
- * mYgang / Baby Grape — รันซอร์สต้นฉบับ Baby Grape เต็มระบบ
- * ดึง index จาก marshmayris/baby-grape-bot แล้วแพตช์ env ให้รองรับ Railway
+ * mYgang — รันซอร์สต้นฉบับ Baby Grape (marshmayris/baby-grape-bot)
  */
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const https = require("https");
-const { spawn } = require("child_process");
 
 const ORIGIN =
   process.env.BABYGRAPE_SOURCE_URL ||
@@ -22,7 +20,7 @@ function fetchText(url) {
           return;
         }
         if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode} from ${url}`));
+          reject(new Error("HTTP " + res.statusCode + " from " + url));
           return;
         }
         const chunks = [];
@@ -34,31 +32,31 @@ function fetchText(url) {
 }
 
 function patchSource(src) {
-  // รองรับทั้ง token / DISCORD_TOKEN และ guildId / GUILD_ID
   let out = src;
   out = out.replace(
-    /const token = process\.env\.token;/
-,
+    "const token = process.env.token;",
     "const token = process.env.token || process.env.DISCORD_TOKEN;",
   );
   out = out.replace(
-    /const guildId = process\.env\.guildId;/
-,
+    "const guildId = process.env.guildId;",
     "const guildId = process.env.guildId || process.env.GUILD_ID;",
   );
-  // ถ้ามี channel env แบบ UPPER_CASE จาก setup เก่า แมปให้
-  const mapBlock = `
-// --- mYgang env aliases ---
-if (!process.env.controlChannelId && process.env.CONTROL_CHANNEL_ID) process.env.controlChannelId = process.env.CONTROL_CHANNEL_ID;
-if (!process.env.logChannelId && process.env.LOG_CHANNEL_ID) process.env.logChannelId = process.env.LOG_CHANNEL_ID;
-if (!process.env.scoreChannelId && process.env.SCORE_CHANNEL_ID) process.env.scoreChannelId = process.env.SCORE_CHANNEL_ID;
-if (!process.env.targetChannelId && process.env.TARGET_CHANNEL_ID) process.env.targetChannelId = process.env.TARGET_CHANNEL_ID;
-if (!process.env.archiveCategoryId && process.env.ARCHIVE_CATEGORY_ID) process.env.archiveCategoryId = process.env.ARCHIVE_CATEGORY_ID;
-if (!process.env.adminRoleId && process.env.ADMIN_ROLE_ID) process.env.adminRoleId = process.env.ADMIN_ROLE_ID;
-if (!process.env.mentionRoleId && process.env.MENTION_ROLE_ID) process.env.mentionRoleId = process.env.MENTION_ROLE_ID;
-`;
+  const mapBlock = [
+    "// --- mYgang env aliases ---",
+    "if (!process.env.controlChannelId && process.env.CONTROL_CHANNEL_ID) process.env.controlChannelId = process.env.CONTROL_CHANNEL_ID;",
+    "if (!process.env.logChannelId && process.env.LOG_CHANNEL_ID) process.env.logChannelId = process.env.LOG_CHANNEL_ID;",
+    "if (!process.env.scoreChannelId && process.env.SCORE_CHANNEL_ID) process.env.scoreChannelId = process.env.SCORE_CHANNEL_ID;",
+    "if (!process.env.targetChannelId && process.env.TARGET_CHANNEL_ID) process.env.targetChannelId = process.env.TARGET_CHANNEL_ID;",
+    "if (!process.env.archiveCategoryId && process.env.ARCHIVE_CATEGORY_ID) process.env.archiveCategoryId = process.env.ARCHIVE_CATEGORY_ID;",
+    "if (!process.env.adminRoleId && process.env.ADMIN_ROLE_ID) process.env.adminRoleId = process.env.ADMIN_ROLE_ID;",
+    "if (!process.env.mentionRoleId && process.env.MENTION_ROLE_ID) process.env.mentionRoleId = process.env.MENTION_ROLE_ID;",
+    "",
+  ].join("\n");
   if (!out.includes("mYgang env aliases")) {
-    out = out.replace('require("dotenv").config();', 'require("dotenv").config();\n' + mapBlock);
+    out = out.replace(
+      'require("dotenv").config();',
+      'require("dotenv").config();\n' + mapBlock,
+    );
   }
   return out;
 }
@@ -70,12 +68,10 @@ async function main() {
     const raw = await fetchText(ORIGIN);
     const patched = patchSource(raw);
     fs.writeFileSync(TARGET, patched, "utf8");
-    console.log("บันทึก", TARGET, "("+patched.length+" bytes)");
+    console.log("บันทึก", TARGET, "(" + patched.length + " bytes)");
   } else {
     console.log("ใช้ซอร์สที่แคชไว้แล้ว:", TARGET);
   }
-
-  // รันเป็น process หลัก
   require(TARGET);
 }
 
